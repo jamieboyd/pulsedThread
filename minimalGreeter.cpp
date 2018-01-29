@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <pulsedThread.h>
 
-
-
 /****************************************High function*********************************************************/
 void ptTest_Hi (void * volatile taskData){
 	// cast task data to a character array.

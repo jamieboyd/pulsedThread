@@ -78,4 +78,9 @@ if __name__ == '__main__':
     print ("goodbye time is ",  pyGreeter.get_goodbye_time(), 'seconds')
     pyGreeter.TurnOnEndFunc (PT_Py_Greeter.END_FUNC_PULSE_MODE)
     pyGreeter.greet_many (3)
-     
+    result = 0
+    while pyGreeter.is_greeting ():
+        for i in range (1,10000):
+            result += (i*i/(i + 1))
+        print ('result = ', result)       
+    print ('Greeter is finished now. Final result was', result)

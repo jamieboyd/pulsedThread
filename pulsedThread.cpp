@@ -74,8 +74,6 @@ inline void WAITINLINE2 (bool itSleeps, struct timeval* turnaroundTime, struct t
 	for (gettimeofday (&currentTime, NULL);(timercmp (&currentTime, spinEndTime, <)); gettimeofday (&currentTime, NULL));
 }
 
-
-
 /*********************************************************************************************
 the actual thread function needs to be a C  style function, not a class method
 Last Modified:
@@ -357,10 +355,10 @@ Last Modified:
 pulsedThread::pulsedThread (unsigned int gDelay, unsigned int gDur, unsigned int gPulses, void *  initData, int (*initFunc)(void *, void * volatile &), void (*gLoFunc)(void * volatile), void (*gHiFunc)(void * volatile), int gAccLevel, int &errCode){
 	
 	errCode = ticks2Times (gDelay, gDur, gPulses, theTask);
+#if beVerbose
 	if (errCode){
 		printf ("pulsedThread constructor failed.\n"); // tick2times will print error description
 	}else{
-#if beVerbose
 		printf ("pulsedThread constructor with train Frequency = %.2f, trainDuration = %.2f, trainDutyCycle = %.2f.\n", theTask.trainFrequency, theTask.trainDuration,theTask.trainDutyCycle);
 #endif
 		theTask.nPulses = gPulses; // 0 = infinite train, 1 = single pulse, >=2  = number of pulses in a train, 
@@ -545,7 +543,7 @@ void pulsedThread::stopInfiniteTrain (){
 	}
 }
 
-/*****************************************************************************************************
+/* ****************************************************************************************************
 Changes the delay of each pulse by modifying data stored in the structure of the task
 Last Modified:
 2016/08/08 by Jamie Boyd
@@ -664,7 +662,7 @@ void pulsedThread::setLowFunc (void (*loFunc)(void * volatile)){
 	theTask.loFunc = loFunc;
 }
 
-/************************************************************************
+/* ***********************************************************************
 Sets function that runs on high tick
 last modified 2016/12/06 by Jamie Boyd  - initial version
 */
@@ -672,7 +670,7 @@ void pulsedThread::setHighFunc (void (*hiFunc)(void * volatile)){
 	theTask.hiFunc = hiFunc;
 }
 
-/************************************************************************
+/* ***********************************************************************
 Sets function that runs at end of each pulse, or train of pulses 
 last modified 2016/12/13 by Jamie Boyd  - initial version
 */
@@ -723,7 +721,7 @@ int pulsedThread::modCustom (int (*modFunc)(void *, taskParams * ), void * modDa
 	}
 }
 
-/********************************************************************************************************
+/* *******************************************************************************************************
 Returns 1 if a puslsedThread has requested a custom data modification form the pthread, but it has
 not been completed. If no request is pending, returns 0.
 Last Modified:
@@ -776,10 +774,10 @@ float pulsedThread::getTrainDutyCycle (void){
 }
 	
 
-/*****************************************************************************************************
+/* ****************************************************************************************************
 Destructor waits for task to be free, then cancels it
 Last Modified:
-2017/11/29 by jamie Boyd - added call to function spointer, delCustomDataFunc, for deletion of customData
+2017/11/29 by jamie Boyd - added call to function pointer, delCustomDataFunc, for deletion of customData
 2016/01/16 by Jamie Boyd - removed delete customData and modCustomData, as this should be deleted by maker of pulsed thread
 2015/09/29 by Jamie Boyd - initial version
 */

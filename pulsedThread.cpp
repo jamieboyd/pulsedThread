@@ -1,12 +1,65 @@
 #include "pulsedThread.h"
 
-/**************************************************************************************
-//Utility functions to configure timespecs and timevals for thread timing and to do the waiting for acc levels 1 and 2
-****************************************************************************************/
 
-/**************************************************************************************
-used for accLevel 0 when all we do is sleep for entire duration
-*/
+/* ******************************* Non-Class Utility Functions Used by Thread. Inlined for speed ***************************************************************
+******************************************************************************************************************************************************************
+
+***** Converts from pulse-based info (pulseDelay, pulseDuation, number of pulses) to frequency-based info (trainDuration, frequency, dutyCycle) *******/
+inline int ticks2Times (unsigned int pulseDelay, unsigned int pulseDuration, unsigned int nPulses, taskParams &theTask){
+#if beVerbose
+	printf ("ticks2Times requested params: delay = %d, duration = %d, nPulses = %d\n", pulseDelay, pulseDuration, nPulses);
+#endif
+	if (pulseDuration == 0){
+#if beVerbose
+		printf ("ticks2Times requested param error: delay = %d, duration = %d, nPulses = %d\n", pulseDelay, pulseDuration, nPulses);
+#endif
+		return 1;
+	}
+	if (((theTask.nPulses == kINFINITETRAIN) && (nPulses != kINFINITETRAIN)) && (theTask.doTask & 1)){
+#if beVerbose
+		printf ("ticks2Times error, infinite train with task not stopped: current length = %d and new length = %d\n", theTask.nPulses, nPulses);
+#endif
+		return 1;
+	}
+	float pulseTime = float(pulseDelay + pulseDuration)/1e06;
+	theTask.trainFrequency = 1/pulseTime;
+	theTask.trainDuration = pulseTime * nPulses;
+	theTask.trainDutyCycle = ((float)pulseDuration)/((float)(pulseDelay + pulseDuration));
+	return 0;
+}
+
+/* ** Converts from frequency-based info (trainDuration, frequency, dutyCycle) to pulse-based info (pulseDelay, pulseDuation, number of pulses) **/
+inline int times2Ticks (float frequency, float dutyCycle, float trainDuration, taskParams &theTask){
+#if beVerbose
+	printf ("times2Ticks requested params:  frequency = %.2f, dutyCycle = %.2f, trainDuration = %.2f\n", frequency, dutyCycle, trainDuration);
+#endif
+	if ((trainDuration < 0) || (dutyCycle <=0) || (dutyCycle > 1) || (frequency < 0)){
+#if beVerbose
+		printf ("times2Ticks requested param error:  frequency = %.2f, dutyCycle = %.2f, trainDuration = %.2f\n", frequency, dutyCycle, trainDuration);
+#endif
+		return 1;
+	}
+	float pulseMicrosecs = 1e06 / frequency;
+	unsigned int newDelay= round (pulseMicrosecs * (1 - dutyCycle));
+	unsigned int newDur = round (pulseMicrosecs * dutyCycle);
+	unsigned int newnPulses = round ((trainDuration * 1e06) / pulseMicrosecs);
+	
+	if (((theTask.nPulses == kINFINITETRAIN) && (newnPulses != kINFINITETRAIN)) && (theTask.doTask & 1)){
+#if beVerbose
+		printf ("times2Ticks error, infinite train with task not stopped: current length = %d and new length = %d\n", theTask.nPulses, newnPulses);
+#endif
+		return 1;
+	}
+	theTask.pulseDelayUsecs = newDelay;
+	theTask.pulseDurUsecs =  newDur;
+	theTask.nPulses = newnPulses;
+	return 0;
+}
+
+/* ******************* Configure timespecs and timevals for thread timing and to do the waiting for acc levels 1 and 2 **************
+
+******************************************************** used for accLevel 0 *********************************************************
+All we do is sleep for entire duration */
 inline void configureSleeper (unsigned int microSeconds, struct timespec *Sleeper){
 	unsigned long int timeNM; 
 	timeNM = microSeconds;
@@ -14,10 +67,8 @@ inline void configureSleeper (unsigned int microSeconds, struct timespec *Sleepe
 	Sleeper->tv_nsec = timeNM  * 1e03; // microsecs to nano secs, timespec uses nanseconds, timevals use microseconds
 }
 
-/**************************************************************************************
-used for accLevel 1 when we sleep for time period - kSLEEPTURNAROUND, then wake up and spin until timed period end
-returns false if period is too short for sleeping, else true
-*/
+/* ************************************************** used for accLevel 1 **********************************************************
+We sleep for time period - kSLEEPTURNAROUND, then wake up and spin until timed period end returns false if period is too short for sleeping, else true */
 inline bool configureTurnaroundSleeper (unsigned int microSeconds, struct timespec *Sleeper){
     if (microSeconds < kSLEEPTURNAROUND){
         return false;
@@ -29,27 +80,8 @@ inline bool configureTurnaroundSleeper (unsigned int microSeconds, struct timesp
         return true;
     }
 }
-/**************************************************************************************
-// used for acclevels 1 and 2 to hold periods for delay and duration, which are  added to spinEndTime for each period
-*/
-inline void configureTimer (unsigned int microSeconds, struct timeval *Timer){
-    unsigned long int timeNM; // use long int to avoid overflow
-    timeNM = microSeconds; // timeval uses microsecs
-    for (Timer->tv_sec =0; timeNM >= 1e06; timeNM -= 1e06, Timer->tv_sec +=1);
-    Timer->tv_usec = timeNM;
-}
 
-/**************************************************************************************
-// used for acclevel 2 when sleep stuff is configured on the fly, but we can calculate in advance if sleep is entirely ruled out
-*/
-inline bool  configureTurnaround (unsigned int microSeconds){
-    if (microSeconds < kSLEEPTURNAROUND){
-        return false;
-    }else{
-        return true;
-    }
-}
- 
+/* ************************************** Sleeps for calculated time,then wakes and spins **************************/
 inline void WAITINLINE1 (bool itSleeps, struct timespec *sleeper, struct timeval* spinEndTime){
 	struct timeval currentTime;
 	if (itSleeps){
@@ -58,6 +90,27 @@ inline void WAITINLINE1 (bool itSleeps, struct timespec *sleeper, struct timeval
 	for (gettimeofday (&currentTime, NULL);(timercmp (&currentTime, spinEndTime, <)); gettimeofday (&currentTime, NULL));
 }
 
+/* ********************************************** used for accuracy levels 1 and 2 ***************************************
+Configure Timers to hold periods for delay and duration, which are  added to spinEndTime for each period */
+inline void configureTimer (unsigned int microSeconds, struct timeval *Timer){
+    unsigned long int timeNM; // use long int to avoid overflow
+    timeNM = microSeconds; // timeval uses microsecs
+    for (Timer->tv_sec =0; timeNM >= 1e06; timeNM -= 1e06, Timer->tv_sec +=1);
+    Timer->tv_usec = timeNM;
+}
+
+
+/* ******************************************** used for accuracy level 2 *******************************************************
+Sleep stuff is configured on the fly, but we can calculate in advance if sleep is entirely ruled out */
+inline bool  configureTurnaround (unsigned int microSeconds){
+    if (microSeconds < kSLEEPTURNAROUND){
+        return false;
+    }else{
+        return true;
+    }
+}
+ 
+/* **********************************************calculates sleep times for each pulse ******************************************/
 inline void WAITINLINE2 (bool itSleeps, struct timeval* turnaroundTime, struct timeval* spinEndTime){
 	struct timeval currentTime;
 	struct timeval sleepEndTime;
@@ -74,11 +127,11 @@ inline void WAITINLINE2 (bool itSleeps, struct timeval* turnaroundTime, struct t
 	for (gettimeofday (&currentTime, NULL);(timercmp (&currentTime, spinEndTime, <)); gettimeofday (&currentTime, NULL));
 }
 
-/*********************************************************************************************
-the actual thread function needs to be a C  style function, not a class method
+
+/* ************** the thread function needs to be a C-style function, not a class method ********************************************************
+****************************************************************************************************************************************************
 Last Modified:
-2016/12/14 by Jamie Boyd - added endFunc
-*/
+2016/12/14 by Jamie Boyd - added endFunc */
 extern "C" void* pulsedThreadFunc (void * tData){
 	// cast tData to task param stuct pointer
 	taskParams *theTask = (taskParams *) tData;
@@ -344,21 +397,24 @@ extern "C" void* pulsedThreadFunc (void * tData){
     return NULL;
 }
 
-/* *****************************************************************************************************
+/* ********************************************* pulsedThead Class Methods*******************************************************************************
+************************************************************************************************************************************************************
 Same constructors for all 3 tasks
 Last Modified:
 2017/11/22 by Jamie Boyd - added nullptr test for init function before running it.
 2016/12/06 by Jamie Boyd added loFunc and hiFunc function pointers for flexibility 
 2016/12/12 by Jamie Boyd - removed mode as separate paramater, redundant info with nPulses
-2016/2/14 by Jamie Boyd - added constructor with specifications not for pulses, but for train (frequency, trainDuration in secs, dutyCycle) 
-*/
-pulsedThread::pulsedThread (unsigned int gDelay, unsigned int gDur, unsigned int gPulses, void *  initData, int (*initFunc)(void *, void * volatile &), void (*gLoFunc)(void * volatile), void (*gHiFunc)(void * volatile), int gAccLevel, int &errCode){
+2016/2/14 by Jamie Boyd - added constructor with specifications not for pulses, but for train (frequency, trainDuration in secs, dutyCycle) */
+pulsedThread::pulsedThread (unsigned int gDelay, unsigned int gDur, unsigned int gPulses, void *  initData, 
+int (*initFunc)(void *, void * &), void (*gLoFunc)(void *), void (*gHiFunc)(void *), int gAccLevel, int &errCode){
 	
 	errCode = ticks2Times (gDelay, gDur, gPulses, theTask);
-#if beVerbose
 	if (errCode){
+#if beVerbose
 		printf ("pulsedThread constructor failed.\n"); // tick2times will print error description
+#endif
 	}else{
+#if beVerbose
 		printf ("pulsedThread constructor with train Frequency = %.2f, trainDuration = %.2f, trainDutyCycle = %.2f.\n", theTask.trainFrequency, theTask.trainDuration,theTask.trainDutyCycle);
 #endif
 		theTask.nPulses = gPulses; // 0 = infinite train, 1 = single pulse, >=2  = number of pulses in a train, 
@@ -386,7 +442,9 @@ pulsedThread::pulsedThread (unsigned int gDelay, unsigned int gDur, unsigned int
 			errCode =initFunc(initData , theTask.taskCustomData);
 		}
 		if (errCode){
+#if beVerbose
 			printf ("pulsedThread initialization callback error: %d\n", errCode);
+#endif
 		}else{
 			// init mutex and condition var
 			pthread_mutex_init(&theTask.taskMutex, NULL);
@@ -397,11 +455,13 @@ pulsedThread::pulsedThread (unsigned int gDelay, unsigned int gDur, unsigned int
 	}
 }
 
-pulsedThread::pulsedThread (float gFrequency, float gDutyCycle, float gTrainDuration, void *  initData, int (*initFunc)(void *, void * volatile &), void (*gLoFunc)(void * volatile), void (*gHiFunc)(void * volatile), int gAccLevel, int &errCode){
+pulsedThread::pulsedThread (float gFrequency, float gDutyCycle, float gTrainDuration, void *  initData, int (*initFunc)(void *, void * &), void (*gLoFunc)(void *), void (*gHiFunc)(void *), int gAccLevel, int &errCode){
 
 	errCode = times2Ticks (gFrequency, gDutyCycle, gTrainDuration, theTask);
 	if (errCode){
+#if beVerbose
 		printf ("pulsedThread constructor failed.\n"); // time2ticks will print error description
+#endif
 	}else{
 #if beVerbose
 		printf ("pulsedThread constructor with Number of pulses= %d, Pulse Delay microseconds = %d, Pulse Duration microseconds = %d\n", theTask.nPulses, theTask.pulseDelayUsecs ,theTask.pulseDurUsecs);
@@ -431,7 +491,9 @@ pulsedThread::pulsedThread (float gFrequency, float gDutyCycle, float gTrainDura
 			errCode =initFunc(initData , theTask.taskCustomData);
 		}
 		if (errCode){
+#if beVerbose
 			printf ("pulsedThread initialization callback error: %d\n", errCode);
+#endif
 		}else{
 			// init mutex and condition var
 			pthread_mutex_init(&theTask.taskMutex, NULL);
@@ -443,13 +505,12 @@ pulsedThread::pulsedThread (float gFrequency, float gDutyCycle, float gTrainDura
 }
 
 
-/*****************************************************************************************************
+/* ****************************************************************************************************
 gets the lock on the task and increments doTask to signal the thread to do task it is configured to do
 will start an infinite train, though there is a separate function for that
 Last Modified:
 2016/12/13 by Jamie Boyd - improved locking
-2015/09/28 by Jamie Boyd - original version
-*/
+2015/09/28 by Jamie Boyd - original version */
 void pulsedThread::DoTask(void){
 	pthread_mutex_lock (&theTask.taskMutex);
 	// for infinite task, just make sure bit 0 is set
@@ -464,12 +525,11 @@ void pulsedThread::DoTask(void){
 	pthread_mutex_unlock( &theTask.taskMutex );
 }
 
-/*****************************************************************************************************
+/* ****************************************************************************************************
 // gets the lock on the task and increments doTask to signal the thread to do task it is configured to do nTasks times
 //Last Modified:
 2015/09/28 by Jamie Boyd - initial version
-2016/12/13 by Jamie Boyd - improved locking
-*/
+2016/12/13 by Jamie Boyd - improved locking */
 void pulsedThread::DoTasks(unsigned int nTasks){
 	pthread_mutex_lock (&theTask.taskMutex);
 	// for infinite task, just make sure bit 0 is set, kind of pointless to call this function
@@ -484,9 +544,9 @@ void pulsedThread::DoTasks(unsigned int nTasks){
 	pthread_mutex_unlock( &theTask.taskMutex );
 }
 
-// *****************************************************************************************************
-// returns 0 if a thread is not currently doing a task, else returns number of tasks still left to do
-//Last Modified 2015/09/28 by Jamie Boyd
+/* ****************************************************************************************************
+/returns 0 if a thread is not currently doing a task, else returns number of tasks still left to do
+Last Modified 2015/09/28 by Jamie Boyd -  initial verison */
 int pulsedThread::isBusy(){
 	pthread_mutex_lock (&theTask.taskMutex);
 	int taskNum = theTask.doTask;
@@ -497,8 +557,7 @@ int pulsedThread::isBusy(){
 /* *****************************************************************************************************
 waits until a thread is no longer doing a task, then returns
 Last modified:
-2016/12/09 by Jamie Boyd - added paramater for timeout, and added return value for timed out vs not busy
-*/
+2016/12/09 by Jamie Boyd - added paramater for timeout, and added return value for timed out vs not busy */
 int pulsedThread::waitOnBusy(float waitSecs){
 	struct timespec delaySleeper;
 	configureSleeper (1.01 * kSLEEPTURNAROUND, &delaySleeper);
@@ -516,9 +575,9 @@ int pulsedThread::waitOnBusy(float waitSecs){
 	return 1;
 }
 
-// *****************************************************************************************************
-// gets the lock on the task and sets doTask bit 0 to signal the thread to start train
-//Last Modified 2015/09/28 by Jamie Boyd
+/* ***************************************************************************************************
+gets the lock on the task and sets doTask bit 0 to signal the thread to start train
+Last Modified 2015/09/28 by Jamie Boyd */
 void pulsedThread::startInfiniteTrain (void){
 	if ((theTask.nPulses == kINFINITETRAIN) && (!(theTask.doTask & 1))){
 		pthread_mutex_lock (&theTask.taskMutex);
@@ -526,14 +585,16 @@ void pulsedThread::startInfiniteTrain (void){
 		pthread_cond_signal(&theTask.taskVar);
 		pthread_mutex_unlock( &theTask.taskMutex);
 	}else{
+#if beVerbose
 		printf ("startInfiniteTrainError: theTask.nPulses = %d, theTask.doTask = %d.\n", theTask.nPulses , theTask.doTask);
+#endif
 	}
 }
 
-// *****************************************************************************************************
-// sets doTask to 0 to signal the thread to stop train. Inifinite train is not in a position to pay attention
-// to condition variable but is continuously checking doTask
-//Last Modified 2015/09/28 by Jamie Boyd
+/* ****************************************************************************************************
+sets doTask to 0 to signal the thread to stop train. Inifinite train is not in a position to pay attention
+to condition variable but is continuously checking doTask
+Last Modified 2015/09/28 by Jamie Boyd */
 void pulsedThread::stopInfiniteTrain (){
 	if ((theTask.nPulses == kINFINITETRAIN) && (theTask.doTask &~kMODANY)) {
 		pthread_mutex_lock (&theTask.taskMutex);
@@ -547,8 +608,7 @@ void pulsedThread::stopInfiniteTrain (){
 Changes the delay of each pulse by modifying data stored in the structure of the task
 Last Modified:
 2016/08/08 by Jamie Boyd
-2016/12/13 by Jamie Boyd - better locking, delay can be 0 (but duration can't be 0)
-*/
+2016/12/13 by Jamie Boyd - better locking, delay can be 0 (but duration can't be 0) */
 int pulsedThread::modDelay (unsigned int newDelayuSecs){
 	
 	int errCode = ticks2Times (newDelayuSecs, theTask.pulseDurUsecs, theTask.nPulses, theTask);
@@ -567,8 +627,7 @@ int pulsedThread::modDelay (unsigned int newDelayuSecs){
 Changes the duration of the pulse by modifying data stored in the structure of the task
 Last Modified:
 2016/08/09 by Jamie Boyd
-2016/12/13 by Jamie Boyd - better locking
-*/
+2016/12/13 by Jamie Boyd - better locking */
 int pulsedThread::modDur (unsigned int newDurUsecs){
 	
 	int errCode = ticks2Times (theTask.pulseDelayUsecs, newDurUsecs, theTask.nPulses, theTask);
@@ -583,15 +642,14 @@ int pulsedThread::modDur (unsigned int newDurUsecs){
 	return 0;
 }
 
-/*****************************************************************************************************
+/* ****************************************************************************************************
 Modifies nPulses directly, leaving frequency and duty cycle alone - no need to get lock , doTask not changed
 changing nPulses can change mode (pulse=1, train >=2, infinite train =0)
 To change from or to an infinite train, the task must be stopped. ticks2times checks for that
 Last Modified:
 2016/08/12 by Jamie Boyd - made param an int
 2016/12/13 by Jamie Boyd - added guard for changing from or to infinite train
-2016/12/14 by Jamie Boyd - using ticks2times
-*/
+2016/12/14 by Jamie Boyd - using ticks2times */
 int pulsedThread::modTrainLength (unsigned int newPulses){
 
 	int errCode = ticks2Times (theTask.pulseDelayUsecs, theTask.pulseDurUsecs, newPulses, theTask);
@@ -608,8 +666,7 @@ Only Modifies the structure of the task if it is a train and not a pulse, and if
 Last Modified:
 2016/09/10 by Jamie Boyd - initial version
 2016/12/12 by Jamie Boyd - edited for clarity, also used & instead of + to set bits
-2016/12/14 by Jamie Boyd - use new times2ticks function
-*/
+2016/12/14 by Jamie Boyd - use new times2ticks function */
 int pulsedThread::modFreq (float newFreq){
 
 	int errVar = times2Ticks (newFreq, theTask.trainDutyCycle, theTask.trainDuration, theTask);
@@ -624,9 +681,9 @@ int pulsedThread::modFreq (float newFreq){
 	return 0;
 }
 
-// *****************************************************************************************************
-// Changes train duration by changing nPulses, leaving frequency and duty cycle alone
-//Last Modified 2016/12/12 by Jamie Boyd new times2ticks function
+/* ****************************************************************************************************
+Changes train duration by changing nPulses, leaving frequency and duty cycle alone
+Last Modified 2016/12/12 by Jamie Boyd new times2ticks function */
 int pulsedThread::modTrainDur (float newDur){
 	
 	int errVar = times2Ticks (theTask.trainFrequency, theTask.trainDutyCycle, newDur, theTask);
@@ -637,9 +694,9 @@ int pulsedThread::modTrainDur (float newDur){
 	return 0;
 }
 
-// *****************************************************************************************************
-// Changes the duty cycle of the train by modifying delay and duration but not nPulses or frequency
-//Last Modified 2016/12/14 by Jamie Boyd - times vs ticks
+/* ****************************************************************************************************
+Changes the duty cycle of the train by modifying delay and duration but not nPulses or frequency
+Last Modified 2016/12/14 by Jamie Boyd - times vs ticks */
 int pulsedThread::modDutyCycle (float newDutyCycle){
 	
 	int errVar = times2Ticks (theTask.trainFrequency, newDutyCycle, theTask.trainDuration, theTask);
@@ -654,43 +711,38 @@ int pulsedThread::modDutyCycle (float newDutyCycle){
 	return 0;
 }
 	
-/************************************************************************
+/* ***********************************************************************
 Sets function that runs on low tick
-last modified 2016/12/06 by Jamie Boyd  - initial version
-*/
-void pulsedThread::setLowFunc (void (*loFunc)(void * volatile)){
+last modified 2016/12/06 by Jamie Boyd  - initial version */
+void pulsedThread::setLowFunc (void (*loFunc)(void *)){
 	theTask.loFunc = loFunc;
 }
 
 /* ***********************************************************************
 Sets function that runs on high tick
-last modified 2016/12/06 by Jamie Boyd  - initial version
-*/
-void pulsedThread::setHighFunc (void (*hiFunc)(void * volatile)){
+last modified 2016/12/06 by Jamie Boyd  - initial version */
+void pulsedThread::setHighFunc (void (*hiFunc)(void *)){
 	theTask.hiFunc = hiFunc;
 }
 
 /* ***********************************************************************
 Sets function that runs at end of each pulse, or train of pulses 
-last modified 2016/12/13 by Jamie Boyd  - initial version
-*/
+last modified 2016/12/13 by Jamie Boyd  - initial version */
 void pulsedThread::setEndFunc (void (*endFunc)(taskParams *)){
 	theTask.endFunc = endFunc;
 }
 
-/************************************************************************
+/* ***********************************************************************
 removes the function that runs at end of each pulse, or train of pulses
-last modified 2016/12/13 by Jamie Boyd  - initial version
-*/
+last modified 2016/12/13 by Jamie Boyd  - initial version */
 void pulsedThread::unSetEndFunc (void){
 	theTask.endFunc = nullptr;
 }
 
-/************************************************************************
+/* ***********************************************************************
 Returns 1 if you have an endFunc set, else 0.  Does not check that
 the endFunc is a valid function
-last modified 2017/01/27 by Jamie Boyd  - initial version
-*/
+last modified 2017/01/27 by Jamie Boyd  - initial version */
 int pulsedThread::hasEndFunc  (void){
 	if (theTask.endFunc == nullptr){
 		return 0;
@@ -699,12 +751,11 @@ int pulsedThread::hasEndFunc  (void){
 	}
 }
 
-/*****************************************************************************************************
+/* ****************************************************************************************************
 Changes taskCustomData with supplied callback function and pointer to data
 Last Modified:
 2016/12/07 by Jamie Boyd - first version
-2016/12/12 by Jamie Boyd - added option for locking vs non-locking version
-*/
+2016/12/12 by Jamie Boyd - added option for locking vs non-locking version */
 int pulsedThread::modCustom (int (*modFunc)(void *, taskParams * ), void * modData, int isLocking){	
 	// if locking, we install callback function and data in the task, and request it to be run
 	if (isLocking){
@@ -736,7 +787,7 @@ int pulsedThread::getModCustomStatus (void){
 }
 
 /* sets pointer to a function to delete customData when pulsedThread is killed */
-void pulsedThread::setCustomDataDelFunc  (void (*delFunc)( void * volatile)){
+void pulsedThread::setCustomDataDelFunc  (void (*delFunc)( void *)){
 	this->delCustomDataFunc = delFunc;
 }
 
@@ -779,8 +830,7 @@ Destructor waits for task to be free, then cancels it
 Last Modified:
 2017/11/29 by jamie Boyd - added call to function pointer, delCustomDataFunc, for deletion of customData
 2016/01/16 by Jamie Boyd - removed delete customData and modCustomData, as this should be deleted by maker of pulsed thread
-2015/09/29 by Jamie Boyd - initial version
-*/
+2015/09/29 by Jamie Boyd - initial version */
 pulsedThread::~pulsedThread(){
 	// cancel thread, first waiting til it is not busy
 	// if waiting for an infinite train to finish, stop it first
@@ -790,7 +840,7 @@ pulsedThread::~pulsedThread(){
 		pthread_cond_signal(&theTask.taskVar);
 		pthread_mutex_unlock( &theTask.taskMutex);
 	}
-	this->waitOnBusy(1000); // should be long enough
+	//this->waitOnBusy(1000); // should be long enough
 	pthread_mutex_lock (&theTask.taskMutex);
 	pthread_cancel(theTask.taskThread);
 	pthread_mutex_unlock (&theTask.taskMutex);

@@ -8,7 +8,7 @@
 This function initializes the custom data the thread will need. Previously, we made and filled a ptTestStruct
 structure initDataP and passed it to the pulsedThread construtor  (in main).
 Here we make an initialization */
-int ptTest_Init (void * initDataP, void *  volatile &taskDataP){
+int ptTest_Init (void * initDataP, void * &taskDataP){
 
 	// initDataP is a pointer to our custom data structure, so cast it to that
 	ptTestStructPtr initData = (ptTestStructPtr) initDataP;
@@ -30,7 +30,7 @@ int ptTest_Init (void * initDataP, void *  volatile &taskDataP){
 
 
 /****************************************High and Low functions*********************************************************/
-void ptTest_Hi (void * volatile taskData){
+void ptTest_Hi (void * taskData){
 // cast task data to our custom struct
 	ptTestStructPtr ourData = (ptTestStructPtr) taskData;
 	// Print
@@ -42,7 +42,7 @@ void ptTest_Hi (void * volatile taskData){
 }
 
 
-void ptTest_Lo (void * volatile taskDataP){
+void ptTest_Lo (void * taskDataP){
 	// cast task data to our custom struct
 	ptTestStructPtr ourData = (ptTestStructPtr) taskDataP;
 	// Print
@@ -76,7 +76,7 @@ int main(int argc, char **argv){
 	initStruct.name [13] = 0;
 	// make a pulsed thread with our pttestStruct and our Hi and Lo functions. USe microsecond ddelay, microsecond duration, and number of pulses method
 	int errVar;
-	pulsedThread * train1 = new pulsedThread ((unsigned int)50000, (unsigned int)50000, (unsigned int)10, (void * volatile) &initStruct, &ptTest_Init, &ptTest_Lo, &ptTest_Hi, ACC_MODE_SLEEPS, errVar);
+	pulsedThread * train1 = new pulsedThread ((unsigned int)50000, (unsigned int)50000, (unsigned int)10, (void *) &initStruct, &ptTest_Init, &ptTest_Lo, &ptTest_Hi, ACC_MODE_SLEEPS, errVar);
 	if (errVar){
 		printf ("Failed to make pulsed thread.\n");
 		return 0;
@@ -95,7 +95,7 @@ int main(int argc, char **argv){
 	initStruct.name [22] = 'w';
 	initStruct.name [23] = 'o';
 	initStruct.name [24] = 0;
-	pulsedThread * train2 = new pulsedThread ((unsigned int)100000, (unsigned int)100000, (unsigned int)5, (void * volatile) &initStruct, &ptTest_Init, &ptTest_Lo, &ptTest_Hi, ACC_MODE_SLEEPS, errVar);
+	pulsedThread * train2 = new pulsedThread ((unsigned int)100000, (unsigned int)100000, (unsigned int)5, (void *) &initStruct, &ptTest_Init, &ptTest_Lo, &ptTest_Hi, ACC_MODE_SLEEPS, errVar);
 	if (errVar){
 		printf ("Failed to make second pulsed thread.\n");
 		return 0;

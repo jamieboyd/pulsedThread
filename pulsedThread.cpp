@@ -4,58 +4,6 @@
 /* ******************************* Non-Class Utility Functions Used by Thread. Inlined for speed ***************************************************************
 ******************************************************************************************************************************************************************
 
-***** Converts from pulse-based info (pulseDelay, pulseDuation, number of pulses) to frequency-based info (trainDuration, frequency, dutyCycle) *******/
-inline int ticks2Times (unsigned int pulseDelay, unsigned int pulseDuration, unsigned int nPulses, taskParams &theTask){
-#if beVerbose
-	printf ("ticks2Times requested params: delay = %d, duration = %d, nPulses = %d\n", pulseDelay, pulseDuration, nPulses);
-#endif
-	if (pulseDuration == 0){
-#if beVerbose
-		printf ("ticks2Times requested param error: delay = %d, duration = %d, nPulses = %d\n", pulseDelay, pulseDuration, nPulses);
-#endif
-		return 1;
-	}
-	if (((theTask.nPulses == kINFINITETRAIN) && (nPulses != kINFINITETRAIN)) && (theTask.doTask & 1)){
-#if beVerbose
-		printf ("ticks2Times error, infinite train with task not stopped: current length = %d and new length = %d\n", theTask.nPulses, nPulses);
-#endif
-		return 1;
-	}
-	float pulseTime = float(pulseDelay + pulseDuration)/1e06;
-	theTask.trainFrequency = 1/pulseTime;
-	theTask.trainDuration = pulseTime * nPulses;
-	theTask.trainDutyCycle = ((float)pulseDuration)/((float)(pulseDelay + pulseDuration));
-	return 0;
-}
-
-/* ** Converts from frequency-based info (trainDuration, frequency, dutyCycle) to pulse-based info (pulseDelay, pulseDuation, number of pulses) **/
-inline int times2Ticks (float frequency, float dutyCycle, float trainDuration, taskParams &theTask){
-#if beVerbose
-	printf ("times2Ticks requested params:  frequency = %.2f, dutyCycle = %.2f, trainDuration = %.2f\n", frequency, dutyCycle, trainDuration);
-#endif
-	if ((trainDuration < 0) || (dutyCycle <=0) || (dutyCycle > 1) || (frequency < 0)){
-#if beVerbose
-		printf ("times2Ticks requested param error:  frequency = %.2f, dutyCycle = %.2f, trainDuration = %.2f\n", frequency, dutyCycle, trainDuration);
-#endif
-		return 1;
-	}
-	float pulseMicrosecs = 1e06 / frequency;
-	unsigned int newDelay= round (pulseMicrosecs * (1 - dutyCycle));
-	unsigned int newDur = round (pulseMicrosecs * dutyCycle);
-	unsigned int newnPulses = round ((trainDuration * 1e06) / pulseMicrosecs);
-	
-	if (((theTask.nPulses == kINFINITETRAIN) && (newnPulses != kINFINITETRAIN)) && (theTask.doTask & 1)){
-#if beVerbose
-		printf ("times2Ticks error, infinite train with task not stopped: current length = %d and new length = %d\n", theTask.nPulses, newnPulses);
-#endif
-		return 1;
-	}
-	theTask.pulseDelayUsecs = newDelay;
-	theTask.pulseDurUsecs =  newDur;
-	theTask.nPulses = newnPulses;
-	return 0;
-}
-
 /* ******************* Configure timespecs and timevals for thread timing and to do the waiting for acc levels 1 and 2 **************
 
 ******************************************************** used for accLevel 0 *********************************************************
@@ -840,7 +788,7 @@ pulsedThread::~pulsedThread(){
 		pthread_cond_signal(&theTask.taskVar);
 		pthread_mutex_unlock( &theTask.taskMutex);
 	}
-	//this->waitOnBusy(1000); // should be long enough
+	this->waitOnBusy(1000); // should be long enough
 	pthread_mutex_lock (&theTask.taskMutex);
 	pthread_cancel(theTask.taskThread);
 	pthread_mutex_unlock (&theTask.taskMutex);

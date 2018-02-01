@@ -74,6 +74,60 @@ struct taskParams {
 	pthread_cond_t taskVar;
 };
 
+/* **********************Utility functions we want inlined for speed AND available as part of the library must be in the header ************************
+
+***** Converts from pulse-based info (pulseDelay, pulseDuation, number of pulses) to frequency-based info (trainDuration, frequency, dutyCycle) *******/
+inline int ticks2Times (unsigned int pulseDelay, unsigned int pulseDuration, unsigned int nPulses, taskParams &theTask){
+#if beVerbose
+	printf ("ticks2Times requested params: delay = %d, duration = %d, nPulses = %d\n", pulseDelay, pulseDuration, nPulses);
+#endif
+	if (pulseDuration == 0){
+#if beVerbose
+		printf ("ticks2Times requested param error: delay = %d, duration = %d, nPulses = %d\n", pulseDelay, pulseDuration, nPulses);
+#endif
+		return 1;
+	}
+	if (((theTask.nPulses == kINFINITETRAIN) && (nPulses != kINFINITETRAIN)) && (theTask.doTask & 1)){
+#if beVerbose
+		printf ("ticks2Times error, infinite train with task not stopped: current length = %d and new length = %d\n", theTask.nPulses, nPulses);
+#endif
+		return 1;
+	}
+	float pulseTime = float(pulseDelay + pulseDuration)/1e06;
+	theTask.trainFrequency = 1/pulseTime;
+	theTask.trainDuration = pulseTime * nPulses;
+	theTask.trainDutyCycle = ((float)pulseDuration)/((float)(pulseDelay + pulseDuration));
+	return 0;
+}
+
+/* ** Converts from frequency-based info (trainDuration, frequency, dutyCycle) to pulse-based info (pulseDelay, pulseDuation, number of pulses) **/
+inline int times2Ticks (float frequency, float dutyCycle, float trainDuration, taskParams &theTask){
+#if beVerbose
+	printf ("times2Ticks requested params:  frequency = %.2f, dutyCycle = %.2f, trainDuration = %.2f\n", frequency, dutyCycle, trainDuration);
+#endif
+	if ((trainDuration < 0) || (dutyCycle <=0) || (dutyCycle > 1) || (frequency < 0)){
+#if beVerbose
+		printf ("times2Ticks requested param error:  frequency = %.2f, dutyCycle = %.2f, trainDuration = %.2f\n", frequency, dutyCycle, trainDuration);
+#endif
+		return 1;
+	}
+	float pulseMicrosecs = 1e06 / frequency;
+	unsigned int newDelay= round (pulseMicrosecs * (1 - dutyCycle));
+	unsigned int newDur = round (pulseMicrosecs * dutyCycle);
+	unsigned int newnPulses = round ((trainDuration * 1e06) / pulseMicrosecs);
+	
+	if (((theTask.nPulses == kINFINITETRAIN) && (newnPulses != kINFINITETRAIN)) && (theTask.doTask & 1)){
+#if beVerbose
+		printf ("times2Ticks error, infinite train with task not stopped: current length = %d and new length = %d\n", theTask.nPulses, newnPulses);
+#endif
+		return 1;
+	}
+	theTask.pulseDelayUsecs = newDelay;
+	theTask.pulseDurUsecs =  newDur;
+	theTask.nPulses = newnPulses;
+	return 0;
+}
+
 
 /* ***************************************Declaration of the pulsedThread class *******************************************************************************/
 class pulsedThread{
@@ -123,7 +177,7 @@ class pulsedThread{
 		float getTrainFrequency (void); //  train frequency in Hz
 		float getTrainDutyCycle (void); // duty cycle, dur/(dur + delay)
 		
-	private:
+	protected:
 		// thread variables - thread, mutex, condition variable, and task variables are all in the taskParams structure
 		struct taskParams theTask;
 		// function pointer for  function to run to delete taskCustom data, gets passed pointer to custom data. never used by pthread so not in taskParams

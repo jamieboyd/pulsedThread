@@ -8,10 +8,10 @@ setup(name='ptGreeter',
       ext_modules=[
         Extension('ptGreeter',
                   ['Greeter.cpp', 'pyGreeter.cpp'],
-                  include_dirs = ['./'],
-                  library_dirs = ['./','/usr/local/lib'],
+                  include_dirs = ['./',  '/usr/include'],
+                  library_dirs = ['./', '/usr/local/lib'],
 		  extra_compile_args=["-O3", "-std=gnu++11"],
-                  libraries = ['pthread', 'pulsedThread'],
+                  libraries = ['pulsedThread'],
                   )
         ]
 )

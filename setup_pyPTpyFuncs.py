@@ -7,10 +7,10 @@ setup(name='ptPyFuncs',
       ext_modules=[
         Extension('ptPyFuncs',
                   ['pyPTpyFuncs.cpp'],
-                  include_dirs = ['./'],
-                  library_dirs = ['./','/usr/local/lib'],
+                  include_dirs = ['./', '/usr/include']
+                  library_dirs = ['./', '/usr/local/lib'],
 		  extra_compile_args=["-O3", "-std=gnu++11"],
-                  libraries = ['pthread', 'pulsedThread'],
+                  libraries = ['pulsedThread'],
                   )
         ]
 )

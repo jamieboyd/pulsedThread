@@ -10,8 +10,8 @@ typedef struct ptTestStruct{
 }ptTestStruct, *ptTestStructPtr;
 
 /*function declarations for the 3 needed functions, Initialization, Hi, and Lo */
-int ptTest_Init (void * , void * volatile&);
-void ptTest_Hi (void * volatile);
-void ptTest_Lo (void * volatile );
+int ptTest_Init (void * , void *&);
+void ptTest_Hi (void *);
+void ptTest_Lo (void * );
 
 #endif

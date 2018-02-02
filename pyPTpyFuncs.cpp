@@ -4,7 +4,7 @@
 Initialized with a a Python object that has HiFunc, LoFunc, and (possibly) endFunc methods */
 
 // Runs PyObject.HiFunc()  taskCustomData is assumed to be a pointer to a python object that has a method called HiFunc that takes no arguments
-static void pulsedThread_RunPythonHiFunc (void * volatile taskCustomData){
+static void pulsedThread_RunPythonHiFunc (void * taskCustomData){
 	PyObject *PyObjPtr = (PyObject *) taskCustomData;
 	PyGILState_STATE state=PyGILState_Ensure();
 	PyObject *result = PyObject_CallMethod (PyObjPtr, "HiFunc", NULL);
@@ -13,7 +13,7 @@ static void pulsedThread_RunPythonHiFunc (void * volatile taskCustomData){
 }
 
 // Runs PyObject.LoFunc()  taskCustomData is assumed to be a pointer to a python object that has a method called LoFunc that takes no arguments
-static void pulsedThread_RunPythonLoFunc (void * volatile taskCustomData){
+static void pulsedThread_RunPythonLoFunc (void * taskCustomData){
 	PyObject *PyObjPtr = (PyObject *) taskCustomData;
 	PyGILState_STATE state=PyGILState_Ensure();
 	PyObject *result = PyObject_CallMethod (PyObjPtr, "LoFunc", NULL);
@@ -96,7 +96,7 @@ static PyObject* pulsedThreadPy_p (PyObject *self, PyObject *args) {
 	}
 	// make the pulsed thread with PyObjPtr as the Init Data, no INIT function (just copy over the PyObjPtr to taskCustomData), and pulsedThread_RunPythonLoFunc and pulsedThread_RunPythonLoFunc as functions to run
 	int errCode =0;
-	pulsedThread * threadObj = new pulsedThread (lowTicks, highTicks, nPulses, (void * volatile) PyObjPtr, nullptr, &pulsedThread_RunPythonLoFunc, &pulsedThread_RunPythonHiFunc, accLevel, errCode);
+	pulsedThread * threadObj = new pulsedThread (lowTicks, highTicks, nPulses, (void *) PyObjPtr, nullptr, &pulsedThread_RunPythonLoFunc, &pulsedThread_RunPythonHiFunc, accLevel, errCode);
 	if (errCode){
 		PyRun_SimpleString ("print (' error')");
 		return NULL;
@@ -122,7 +122,7 @@ static PyObject* pulsedThreadPy_f (PyObject *self, PyObject *args) {
 	}
 	// make the pulsed thread with PyObjPtr as the Init Data, no INIT function (just copy over the PyObjPtr to taskCustomData), and pulsedThread_RunPythonLoFunc and pulsedThread_RunPythonLoFunc as functions to run
 	int errCode =0;
-	pulsedThread * threadObj = new pulsedThread (frequency, dutyCycle, trainDur, (void * volatile) PyObjPtr, nullptr, &pulsedThread_RunPythonLoFunc, &pulsedThread_RunPythonHiFunc, accLevel, errCode);
+	pulsedThread * threadObj = new pulsedThread (frequency, dutyCycle, trainDur, (void *) PyObjPtr, nullptr, &pulsedThread_RunPythonLoFunc, &pulsedThread_RunPythonHiFunc, accLevel, errCode);
 	if (errCode){
 		PyRun_SimpleString ("print (' error')");
 		return NULL;

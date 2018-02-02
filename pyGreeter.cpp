@@ -44,7 +44,7 @@ static PyObject* pulsed_C_Greeter (PyObject *self, PyObject *args) {
 	
 	// make a pulsed thread with our pttestStruct and our Hi and Lo functions. USe microsecond delay, microsecond duration, and number of pulses method
 	int errCode =0;
-	pulsedThread * threadObj = new pulsedThread ((unsigned int)50000, (unsigned int)50000, (unsigned int)10, (void * volatile) &initStruct, &ptTest_Init, &ptTest_Lo, &ptTest_Hi, accLevel, errCode);
+	pulsedThread * threadObj = new pulsedThread ((unsigned int)50000, (unsigned int)50000, (unsigned int)10, (void *) &initStruct, &ptTest_Init, &ptTest_Lo, &ptTest_Hi, accLevel, errCode);
 	if (errCode){
 		return NULL;
 	}else{

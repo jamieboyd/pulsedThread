@@ -776,19 +776,19 @@ float pulsedThread::getTrainDutyCycle (void){
 /* ****************************************************************************************************
 Destructor waits for task to be free, then cancels it
 Last Modified:
+2018/02/01 by Jamie Boyd - moved wait on busy so it only runs when needed. Also, nw aborts a train in progress after pulses is finished, or 100 seconds
 2017/11/29 by jamie Boyd - added call to function pointer, delCustomDataFunc, for deletion of customData
 2016/01/16 by Jamie Boyd - removed delete customData and modCustomData, as this should be deleted by maker of pulsed thread
 2015/09/29 by Jamie Boyd - initial version */
 pulsedThread::~pulsedThread(){
-	// cancel thread, first waiting til it is not busy
-	// if waiting for an infinite train to finish, stop it first
-	if ((theTask.nPulses ==0) && (theTask.doTask)){
+	// stop the task
+	if (theTask.doTask){
 		pthread_mutex_lock (&theTask.taskMutex);
 		theTask.doTask =0;
 		pthread_cond_signal(&theTask.taskVar);
 		pthread_mutex_unlock( &theTask.taskMutex);
+		this->waitOnBusy(100); // should be long enough to finish last pulse
 	}
-	this->waitOnBusy(1000); // should be long enough
 	pthread_mutex_lock (&theTask.taskMutex);
 	pthread_cancel(theTask.taskThread);
 	pthread_mutex_unlock (&theTask.taskMutex);

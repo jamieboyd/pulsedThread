@@ -3,7 +3,7 @@
 #include <pulsedThread.h>
 
 /****************************************High function*********************************************************/
-void ptTest_Hi (void * volatile taskData){
+void ptTest_Hi (void * taskData){
 	// cast task data to a character array.
 	char* name = (char *) taskData;
 	// Print hello 
@@ -30,10 +30,10 @@ int main(int argc, char **argv){
 	name [13] = 0;
 	// make a pulsed thread with our Hi function but no lo func. Value for low time needs to be 0 for this. Use microsecond delay, microsecond duration, and number of pulses method
 	int errVar;
-	pulsedThread * train1 = new pulsedThread ((unsigned int)0, (unsigned int)5E5, (unsigned int)10, (void * volatile) &name, nullptr, nullptr, &ptTest_Hi, ACC_MODE_SLEEPS, errVar);
+	pulsedThread * train1 = new pulsedThread ((unsigned int)0, (unsigned int)5E5, (unsigned int)10, (void *) &name, nullptr, nullptr, &ptTest_Hi, ACC_MODE_SLEEPS, errVar);
 	if (errVar){
 		printf ("Failed to make pulsed thread.\n");
-		return 0;
+		return 1;
 	}
 	// ask the thread to do a train
 	train1->DoTask ();// a train of 10 times should be enough, so just do it once

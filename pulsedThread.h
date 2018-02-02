@@ -25,7 +25,7 @@ Last Modified:
 
 
  /* ***define beVerbose to non-zero to print out messages that may be useful for debugging or understanding how the code runs ****/
- #define beVerbose 0
+ #define beVerbose 1
  #if beVerbose
  #include <stdio.h>
 #endif
@@ -139,7 +139,7 @@ class pulsedThread{
 		*/
 		pulsedThread (unsigned int , unsigned int , unsigned int , void *  , int (*)(void *, void *  &), void (*)(void *), void (*)(void *), int , int &);
 		pulsedThread  (float , float , float , void *  , int (*)(void *, void * &), void (*)(void *), void (*)(void *), int , int &);
-		~pulsedThread();
+		virtual ~pulsedThread();
 		void DoTask (void); // requests that the thread perform its task once, as currently configured, if not an infinite train, or will start an infinite train
 		void DoTasks (unsigned int nTasks); // requests that the thread perform its task nTasks times, as currently configured, or
 		int isBusy(); // checks if a task is busy, returns how many tasks are left to do

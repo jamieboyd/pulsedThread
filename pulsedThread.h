@@ -74,9 +74,82 @@ struct taskParams {
 	pthread_cond_t taskVar;
 };
 
-/* **********************Utility functions we want inlined for speed AND available as part of the library must be in the header ************************
+/* ******************************* Non-Class Utility Functions Used by Thread. Inlined for speed ****************************************
+******************************************************************************************************************************************
 
-***** Converts from pulse-based info (pulseDelay, pulseDuation, number of pulses) to frequency-based info (trainDuration, frequency, dutyCycle) *******/
+
+ ******************* Configure timespecs and timevals for thread timing and to do the waiting for acc levels 1 and 2 **************
+All we do is sleep for entire duration */
+inline void configureSleeper (unsigned int microSeconds, struct timespec *Sleeper){
+	unsigned long int timeNM; 
+	timeNM = microSeconds;
+	for (Sleeper->tv_sec =0; timeNM >= 1e06; timeNM -= 1e06, Sleeper->tv_sec +=1);
+	Sleeper->tv_nsec = timeNM  * 1e03; // microsecs to nano secs, timespec uses nanseconds, timevals use microseconds
+}
+
+/* ************************************************** used for accLevel 1 **********************************************************
+We sleep for time period - kSLEEPTURNAROUND, then wake up and spin until timed period end returns false if period is too short for sleeping, else true */
+inline bool configureTurnaroundSleeper (unsigned int microSeconds, struct timespec *Sleeper){
+    if (microSeconds < kSLEEPTURNAROUND){
+        return false;
+    }else{
+        unsigned long int timeNM; // use long int to avoid overflow
+        timeNM = (microSeconds - kSLEEPTURNAROUND) ;
+        for (Sleeper->tv_sec =0; timeNM >= 1e06; timeNM -= 1e06, Sleeper->tv_sec +=1);
+        Sleeper->tv_nsec = timeNM * 1e03;// microsecs to nano secs
+        return true;
+    }
+}
+
+/* ************************************** Sleeps for calculated time,then wakes and spins **************************/
+inline void WAITINLINE1 (bool itSleeps, struct timespec *sleeper, struct timeval* spinEndTime){
+	struct timeval currentTime;
+	if (itSleeps){
+		nanosleep (sleeper, NULL);
+	}
+	for (gettimeofday (&currentTime, NULL);(timercmp (&currentTime, spinEndTime, <)); gettimeofday (&currentTime, NULL));
+}
+
+/* ********************************************** used for accuracy levels 1 and 2 ***************************************
+Configure Timers to hold periods for delay and duration, which are  added to spinEndTime for each period */
+inline void configureTimer (unsigned int microSeconds, struct timeval *Timer){
+    unsigned long int timeNM; // use long int to avoid overflow
+    timeNM = microSeconds; // timeval uses microsecs
+    for (Timer->tv_sec =0; timeNM >= 1e06; timeNM -= 1e06, Timer->tv_sec +=1);
+    Timer->tv_usec = timeNM;
+}
+
+
+/* ******************************************** used for accuracy level 2 *******************************************************
+Sleep stuff is configured on the fly, but we can calculate in advance if sleep is entirely ruled out */
+inline bool  configureTurnaround (unsigned int microSeconds){
+    if (microSeconds < kSLEEPTURNAROUND){
+        return false;
+    }else{
+        return true;
+    }
+}
+ 
+/* **********************************************calculates sleep times for each pulse ******************************************/
+inline void WAITINLINE2 (bool itSleeps, struct timeval* turnaroundTime, struct timeval* spinEndTime){
+	struct timeval currentTime;
+	struct timeval sleepEndTime;
+	struct timespec sleeper;
+	if (itSleeps){
+		timersub (spinEndTime, turnaroundTime, &sleepEndTime);  // subtract turnaround time from period end time, put in sleepEndTime 
+		gettimeofday (&currentTime, NULL);
+		if (timercmp (&currentTime, &sleepEndTime, <)){  // if current time is less than sleep end time, calculate a sleep time
+			timersub (&sleepEndTime, &currentTime, &sleepEndTime); //subtract current time from sleep end time , so sleep end time is a duration
+			TIMEVAL_TO_TIMESPEC(&sleepEndTime, &sleeper); 
+			nanosleep (&sleeper, NULL);
+		} 
+	}
+	for (gettimeofday (&currentTime, NULL);(timercmp (&currentTime, spinEndTime, <)); gettimeofday (&currentTime, NULL));
+}
+
+
+/* ************************************** Utility functions to convert between pulse timing and train frequency/duration *********************************
+ **** Converts from pulse-based info (pulseDelay, pulseDuation, number of pulses) to frequency-based info (trainDuration, frequency, dutyCycle) *******/
 inline int ticks2Times (unsigned int pulseDelay, unsigned int pulseDuration, unsigned int nPulses, taskParams &theTask){
 #if beVerbose
 	printf ("ticks2Times requested params: delay = %d, duration = %d, nPulses = %d\n", pulseDelay, pulseDuration, nPulses);
@@ -127,7 +200,6 @@ inline int times2Ticks (float frequency, float dutyCycle, float trainDuration, t
 	theTask.nPulses = newnPulses;
 	return 0;
 }
-
 
 /* ***************************************Declaration of the pulsedThread class *******************************************************************************/
 class pulsedThread{

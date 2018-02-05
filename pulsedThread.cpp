@@ -1,6 +1,85 @@
 #include "pulsedThread.h"
 
 
+ /* *************************************CallBacks for EndFunctions using an Array of values  *************
+Functions for using an array of values for frequency or duty cycle with an endFunc to cycle through the array using pulsedThreadArrayStruct
+EndFuncData is pulsedThreadArrayStructPtr includes
+float * arrayData
+unsigned int startPos
+unsigned int endPos
+unsigned int arrayPos 
+
+***************************** Custom dataMod Callback**********************************
+ Sets up the array of data used to output new values for frequency, duty cycle
+Use with pulsedThread::modCustom
+last modified:
+2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data
+2017/03/02 by Jamie Boyd - initial version */
+int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask){
+	// cast modData to a pulsedThreadArrayStructPtr
+	pulsedThreadArrayStructPtr modDataP = (pulsedThreadArrayStructPtr)modData;
+	// make a new pulsedThreadArrayStruct , and point endFuncDataPtr at it
+	pulsedThreadArrayStructPtr endFuncDataPtr = new pulsedThreadArrayStruct;
+	theTask->endFuncData = endFuncDataPtr;
+	// copy over the data from modData
+	endFuncDataPtr -> arrayData = modDataP->arrayData; // Don't copy data, just pointer to the data. So calling function must not delete arrayData while the thread is active
+	endFuncDataPtr -> startPos = modDataP->startPos; // position in the array to output
+	endFuncDataPtr -> endPos = modDataP->endPos; // number of points in the array
+	endFuncDataPtr -> arrayPos = modDataP->arrayPos; // position in the array to output
+	// delete modData
+	delete ((pulsedThreadArrayStructPtr)modData);
+	return 0;
+} 
+
+/* ************************ EndFunc sets Train Frequency from Array in endFunc data ***************************************
+last Modified:
+2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data */
+void pulsedThreadFreqFromArrayEndFunc (taskParams * theTask){
+	// cast endFunc data pointer to pulsedThreadArrayStructPtr
+	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)theTask->endFuncData;
+	// move to next point in array and warap to start if needed
+	ArrayStructPtr->arrayPos +=1;
+	if(ArrayStructPtr->arrayPos == ArrayStructPtr->endPos){
+		ArrayStructPtr->arrayPos =ArrayStructPtr->startPos;
+	}
+	// use times2Ticks to update taskParams with new timing values
+	times2Ticks (ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos], theTask->trainDutyCycle, theTask->trainDuration, *theTask);
+	theTask->trainFrequency = ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos];
+	// set high order signal bits of doTask that pulse duration and delay have changed
+	theTask->doTask |= (kMODDUR | kMODDELAY);
+}
+
+/* ************************ EndFunc sets Train Duty Cycle from Array in endFunc data ***************************************
+last Modified:
+2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data */
+void pulsedThreadDutyCycleFromArrayEndFunc (taskParams * theTask){
+	// cast endFunc data pointer to pulsedThreadArrayStructPtr
+	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)theTask->endFuncData;
+	// move to next point in array and warap to start if needed
+	ArrayStructPtr->arrayPos +=1;
+	if(ArrayStructPtr->arrayPos == ArrayStructPtr->endPos){
+		ArrayStructPtr->arrayPos =ArrayStructPtr->startPos;
+	}
+	// use times2Ticks to update taskParams with new timing values
+	times2Ticks (theTask->trainFrequency, ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos], theTask->trainDuration, *theTask);
+	theTask->trainDutyCycle = ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos];;
+	theTask->doTask |= (kMODDUR | kMODDELAY);
+}
+
+ /* **************************************************
+ * delete function for endFunc data ONLY for a task using pulsedThreadArrayStruct,
+ *  called when pulsedThread is killed if you explicitly install it with
+ *  pulsedThread::setendFuncDataDelFunc
+ * last modified:
+
+ * 2017/12/06 by Jamie Boyd - initial version */
+ void pulsedThreadArrayStructCustomDel (void * endFuncData){
+	 if (endFuncData != nullptr){
+		 pulsedThreadArrayStructPtr ArrayStructPtr = (pulsedThreadArrayStructPtr) endFuncData;
+		 delete (ArrayStructPtr);
+	 }
+ }
+
 /* ************** the thread function needs to be a C-style function, not a class method ********************************************************
 ****************************************************************************************************************************************************
 Last Modified:
@@ -99,7 +178,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 				theTask->doTask -= kMODDUR;
 			}
 			if (theTask->doTask & kMODCUSTOM){
-				theTask->modCustomFunc (theTask->modCustomData,theTask);
+				theTask->modCustomFunc (theTask->modCustomData, theTask);
 				theTask->doTask -= kMODCUSTOM;
 			}
 			// if after modifying timing and custom mods, we have no task to do, unlock mutex and go to top of loop, waiting on doTask again
@@ -128,7 +207,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 						}
 					}
 				}
-				theTask->hiFunc(theTask->taskCustomData);
+				theTask->hiFunc(theTask->taskData);
 				if (theTask ->accLevel == 0){
 					nanosleep (&durSleeper, NULL);
 				}else{
@@ -139,7 +218,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 						WAITINLINE2 (durSleeps, &turnaroundTime, &spinEndTime);
 					}
 				}
-				theTask->loFunc(theTask->taskCustomData);
+				theTask->loFunc(theTask->taskData);
 				if (theTask->endFunc != nullptr){
 					theTask->endFunc (theTask);
 				}
@@ -188,7 +267,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 					pthread_mutex_unlock (&theTask->taskMutex);
 				}
 				if (theTask->hiFunc != nullptr){
-					theTask->hiFunc(theTask->taskCustomData);
+					theTask->hiFunc(theTask->taskData);
 				}
 				if (theTask ->accLevel == 0){
 					nanosleep (&durSleeper, NULL);
@@ -202,7 +281,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 				}
 				if (theTask->pulseDelayUsecs > 0){
 					if (theTask->loFunc != nullptr){
-						theTask->loFunc(theTask->taskCustomData);
+						theTask->loFunc(theTask->taskData);
 					}
 					if  (theTask ->accLevel ==ACC_MODE_SLEEPS){
 						nanosleep (&delaySleeper, NULL);
@@ -226,7 +305,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 			printf ("A train was called with doTask = %d and nPulses = %d.\n", theTask->doTask, theTask->nPulses);
 #endif
 			for (unsigned int iTick=0; iTick < theTask->nPulses; iTick++){
-				theTask->hiFunc(theTask->taskCustomData);
+				theTask->hiFunc(theTask->taskData);
 				if (theTask ->accLevel == ACC_MODE_SLEEPS){
 					nanosleep (&durSleeper, NULL);
 				}else{
@@ -238,7 +317,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 					}
 				}
 				if (theTask->pulseDelayUsecs > 0){
-					theTask->loFunc(theTask->taskCustomData);
+					theTask->loFunc(theTask->taskData);
 					if  (theTask ->accLevel ==ACC_MODE_SLEEPS){
 						nanosleep (&delaySleeper, NULL);
 					}else{
@@ -256,7 +335,6 @@ extern "C" void* pulsedThreadFunc (void * tData){
 			}
 			break;
 		}
-		
 		// dont decrement doTask if task is an infinite train, else decrement it as we have done a task
 		if (theTask->nPulses != kINFINITETRAIN){
 			pthread_mutex_lock (&theTask->taskMutex);
@@ -269,6 +347,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
     }
     return NULL;
 }
+
 
 /* ********************************************* pulsedThead Class Methods*******************************************************************************
 ************************************************************************************************************************************************************
@@ -296,8 +375,10 @@ int (*initFunc)(void *, void * &), void (*gLoFunc)(void *), void (*gHiFunc)(void
 		theTask.loFunc = gLoFunc;
 		theTask.hiFunc =gHiFunc;
 		theTask.modCustomData = nullptr; // this pointer is initialised null , as we don't always use it
-		delCustomDataFunc = nullptr; //this function pointer is initialised null , as we don't always havea function
 		theTask.endFunc = nullptr;
+		theTask.endFuncData = nullptr;
+		delTaskDataFunc = nullptr; //this function pointer is initialised null , as we don't always have a function
+		delEndFuncDataFunc = nullptr;
 		theTask.accLevel =gAccLevel;
 		// start doTask at 0
 		theTask.doTask =0;
@@ -305,14 +386,14 @@ int (*initFunc)(void *, void * &), void (*gLoFunc)(void *), void (*gHiFunc)(void
 		errCode = 0;
 		if (initFunc == nullptr){
 #if beVerbose
-			printf ("pulsedThread constructor initFunc == nullptr; taskCustomData initialized with copy of initData pointer.\n");
+			printf ("pulsedThread constructor initFunc == nullptr; taskData initialized with copy of initData pointer.\n");
 #endif
-			theTask.taskCustomData = initData;
+			theTask.taskData = initData;
 		}else{
 #if beVerbose
 			printf ("pulsedThread constructor is running the provided initFunc\n");
 #endif
-			errCode =initFunc(initData , theTask.taskCustomData);
+			errCode =initFunc(initData , theTask.taskData);
 		}
 		if (errCode){
 #if beVerbose
@@ -345,23 +426,24 @@ pulsedThread::pulsedThread (float gFrequency, float gDutyCycle, float gTrainDura
 		theTask.loFunc = gLoFunc;
 		theTask.hiFunc =gHiFunc;
 		theTask.modCustomData = nullptr; // this pointer is initialised null , as we don't always use it
-		delCustomDataFunc = nullptr;
 		theTask.endFunc = nullptr;
 		theTask.accLevel =gAccLevel;
+		delTaskDataFunc = nullptr;
+		delEndFuncDataFunc = nullptr;
 		// start doTask at 0
 		theTask.doTask =0;
 		// initialize the task with passed in init func, or just set a pointer to init data if no initFunc
 		errCode = 0;
 		if (initFunc == nullptr){
 #if beVerbose
-			printf ("pulsedThread constructor initFunc == nullptr; taskCustomData initialized with copy of initData pointer.\n");
+			printf ("pulsedThread constructor initFunc == nullptr; taskData initialized with copy of initData pointer.\n");
 #endif
-			theTask.taskCustomData = initData;
+			theTask.taskData = initData;
 		}else{
 #if beVerbose
 			printf ("pulsedThread constructor is running the provided initFunc\n");
 #endif
-			errCode =initFunc(initData , theTask.taskCustomData);
+			errCode =initFunc(initData , theTask.taskData);
 		}
 		if (errCode){
 #if beVerbose
@@ -605,6 +687,26 @@ void pulsedThread::setEndFunc (void (*endFunc)(taskParams *)){
 	theTask.endFunc = endFunc;
 }
 
+/* ************************** Setting up End Functions for selecting train frequency/duty from an array ******************
+sets up/change the array for pulsedThread using the pulsedThreadsetArrayCallback function.
+last modified:
+2018/02/02 by Jamie Boyd - initial version 
+**************************************************/
+int pulsedThread::setUpEndFuncArray (float * newData, unsigned int nData, int isLocking){
+	// fill an array struct from passed-in data
+	pulsedThreadArrayStructPtr setUpStruct = new pulsedThreadArrayStruct;
+	setUpStruct->arrayData = newData;
+	setUpStruct->endPos = nData;
+	setUpStruct->startPos =0;
+	setUpStruct->arrayPos =0;
+	int errVar = modCustom (&pulsedThreadSetUpArrayCallback, (void *) setUpStruct, isLocking);
+	if (errVar ==0){
+		// set up the custom delete function specific to the array callback
+		setEndFuncDataDelFunc (&pulsedThreadArrayStructCustomDel);
+	}
+	return errVar;	
+}
+
 /* ***********************************************************************
 removes the function that runs at end of each pulse, or train of pulses
 last modified 2016/12/13 by Jamie Boyd  - initial version */
@@ -624,8 +726,24 @@ int pulsedThread::hasEndFunc  (void){
 	}
 }
 
+float * pulsedThread::cosineDutyCycleArray (unsigned int arraySize, unsigned int period, float offset, float scaling){
+	const double phi = 6.2831853071794;
+	if (((offset - scaling ) < 0) || ((offset + scaling) > 1)){
+#if beVerbose
+		printf ("adjust offset and scaling so cosine is bounded by 0 and 1/n");
+#endif
+		return nullptr;
+	}
+	// make an array to output
+	float * arrayData = new float [arraySize];
+	for (unsigned int ii=0; ii< arraySize; ii +=1){
+		arrayData [ii] = offset -  scaling * cos (phi * (double)(ii % period)/period);
+	}
+	return arrayData;
+}
+
 /* ****************************************************************************************************
-Changes taskCustomData with supplied callback function and pointer to data
+Changes taskData with supplied callback function and pointer to data
 Last Modified:
 2016/12/07 by Jamie Boyd - first version
 2016/12/12 by Jamie Boyd - added option for locking vs non-locking version */
@@ -646,7 +764,7 @@ int pulsedThread::modCustom (int (*modFunc)(void *, taskParams * ), void * modDa
 }
 
 /* *******************************************************************************************************
-Returns 1 if a puslsedThread has requested a custom data modification form the pthread, but it has
+Returns 1 if a pulsedThread has requested a custom data modification form the pthread, but it has
 not been completed. If no request is pending, returns 0.
 Last Modified:
 2017/11/29 by Jamie Boyd - first version
@@ -660,10 +778,9 @@ int pulsedThread::getModCustomStatus (void){
 }
 
 /* sets pointer to a function to delete customData when pulsedThread is killed */
-void pulsedThread::setCustomDataDelFunc  (void (*delFunc)( void *)){
-	this->delCustomDataFunc = delFunc;
+void pulsedThread::setTaskDataDelFunc  (void (*delFunc)( void *)){
+	this->delTaskDataFunc = delFunc;
 }
-
 
 unsigned int pulsedThread::getNpulses (void){
 	return theTask.nPulses;
@@ -678,8 +795,8 @@ int pulsedThread::getpulseDelayUsecs (void){
 }
 
 // returns pointer to task custom data
-void * pulsedThread::getCustomData (void){
-	return theTask.taskCustomData;
+void * pulsedThread::getTaskData (void){
+	return theTask.taskData;
 }
 
 // train duration in seconds
@@ -696,7 +813,13 @@ float pulsedThread::getTrainFrequency (void){
 float pulsedThread::getTrainDutyCycle (void){
 	return theTask.trainDutyCycle;
 }
-	
+
+/* sets pointer to a function to delete customData when pulsedThread is killed */
+void pulsedThread::setEndFuncDataDelFunc  (void (*delFunc)( void *)){
+	delEndFuncDataFunc = delFunc;
+}
+
+
 
 /* ****************************************************************************************************
 Destructor waits for task to be free, then cancels it
@@ -712,15 +835,19 @@ pulsedThread::~pulsedThread(){
 		theTask.doTask =0;
 		pthread_cond_signal(&theTask.taskVar);
 		pthread_mutex_unlock( &theTask.taskMutex);
-		this->waitOnBusy(100); // should be long enough to finish last pulse
+		//this->waitOnBusy(100); // should be long enough to finish last pulse
 	}
 	pthread_mutex_lock (&theTask.taskMutex);
 	pthread_cancel(theTask.taskThread);
 	pthread_mutex_unlock (&theTask.taskMutex);
 	pthread_mutex_destroy (&theTask.taskMutex);
 	pthread_cond_destroy (&theTask.taskVar);
-	// delete custom data?
-	if (this->delCustomDataFunc != nullptr){
-		this->delCustomDataFunc (theTask.taskCustomData);
+	// delete task custom data?
+	if (delTaskDataFunc != nullptr){
+		delTaskDataFunc (theTask.taskData);
+	}
+	// delete endFunction custom data ?
+	if (delEndFuncDataFunc != nullptr){
+		delEndFuncDataFunc (theTask.endFuncData);
 	}
 }

@@ -16,6 +16,7 @@
 Mixes C-style functions and structures with C++ to use pthreads with convenience of classes
 
 Last Modified:
+2018/02/05 by Jamie Boyd - made a separate pointer in taskParams for endFuncData and added endFuncs for frequency and duty cycle
 2018/01/31 by Jamie Boyd - tidied up a bit, added more comments
 2017/12/06 by Jamie Boyd - added code for more control of custom data, including function pointer for custom delete function  
 2016/12/21 by Jamie Boyd renamed class to pulsedThread as GPIO stuff was put in separate file
@@ -51,32 +52,55 @@ const unsigned int kMODDUR = 67108864; //2^26
 const unsigned int kMODCUSTOM = 134217728;//2^27
 const unsigned int kMODANY = 234881024;//2^27 + 2^26 + 2^25
 
-/* ***************this C-style struct contains all the relevant thread variables and task variables, and is passed to the thread function **********/
+/* ***************this C-style struct contains all the relevant thread variables and task variables, and is passed to the thread function *********
+last modified:
+2018/02/05 by Jamie Boyd - added separate pointer for endFunc data as separate from taskData */
 struct taskParams {
-	int accLevel; // sleeps, sleeps and spins, etc.
+	int accLevel; // sleeps, sleeps and spins, sleeps and/or spins.
 	int doTask; // incremented when tasks are requested, decremented when tasks are done
-	// raw pulse durations and number of pulses, in microseconds
+	/* ****************************raw pulse durations and number of pulses, in microseconds *******************************************/
 	unsigned int pulseDelayUsecs; // duration of low time in microseconds, can be 0, in which case loFunc is never called for a train or infinite train
 	unsigned int pulseDurUsecs; // duration of high time in microseconds, must be > 0
 	unsigned int nPulses; // number of pulses in a train, 0 for infinite train, 1 for a single pulse
-	// requested train durations, train fequencies, and train duty cycles. Same information as above
+	/* *********** train durations, train fequencies, and train duty cycles. Same information as above ************************************/
 	float trainDuration; // duration of train, in seconds, or 0 for infinite train
 	float trainFrequency; // frequency in Hz, i.e., pulses/second
 	float trainDutyCycle; // pulseDurUsecs/(pulseDurUsecs + pulseDelayUsecs)
-	void *  taskCustomData; // pointer to custom taskData
+	/* *****************************Hi and Lo functions, and pointer to thier custom data, ********************************/
 	void (*loFunc)(void *) ; // function to run for low part of pulse, gets pointer to taskData
 	void (*hiFunc)(void * );// function to run for high part of pulse, gets pointer to taskData
+	void * taskData; // pointer to custom taskData for hi and lo functions
+	/* *************************** EndFuncion and pointer to its custom data *******************************************/
 	void (*endFunc)(taskParams *); // runs at end of train, or end of each pulse for infinite train or single pulse, gets pointer to the whole task
-	int (*modCustomFunc)(void *, taskParams *);//function to mod custom task data, taskes pointer to provided custom data, and to the whole Task, runs when kMODCUSTOM is set in doTask
-	void * modCustomData; // needs to be inited before use with modCustomFunc
+	void * endFuncData; // pointer for custom data for end functions
+	/* *************** function to mod custom data and pointer to data to use with mod function ***********************/
+	int (*modCustomFunc)(void *, taskParams *); // runs when kMODCUSTOM is set in doTask
+	void * modCustomData; // needs to be initialized before use with modCustomFunc
+	/* ************************************* pthread variables *************************************************************/
 	pthread_t taskThread;
 	pthread_mutex_t taskMutex ;
 	pthread_cond_t taskVar;
 };
 
-/* ******************************* Non-Class Utility Functions Used by Thread. Inlined for speed ****************************************
-******************************************************************************************************************************************
+/* ******************* A Custom struct for endFunc Data using an array **************************
+for the two provided endFuncs that change frequency and dutyCycle for trains */
+typedef struct pulsedThreadArrayStruct{
+	float * arrayData;		// pointer to an array of floats
+	unsigned int startPos; // where to start in the array when out putting data
+	unsigned int endPos;		// where to end in the array
+	unsigned int arrayPos;	// current position in array, as it is iterated through
+}pulsedThreadArrayStruct, *pulsedThreadArrayStructPtr;
 
+
+/* *************************** Function Declarations for non-thread Functions **********************************/
+int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask);
+void pulsedThreadFreqFromArrayEndFunc (taskParams * theTask);
+void pulsedThreadDutyCycleFromArrayEndFunc (taskParams * theTask);
+void pulsedThreadArrayStructCustomDel(void * taskData);
+
+
+/* **************** Non-Class Utility Functions Used by Thread that we want Inlined for speed yet available for subclasses ********************
+******************************************************************************************************************************************
 
  ******************* Configure timespecs and timevals for thread timing and to do the waiting for acc levels 1 and 2 **************
 All we do is sleep for entire duration */
@@ -207,11 +231,11 @@ class pulsedThread{
 		/* Constructors 
 		errCode is a reference variable that returns 1 if input was not ok, else 0. Should really throw an exception....
 		accLevel is 0 to trust nanosleep for the timing - may not be as accurate, but less processor intenisve, good for up to a couple hundred Hz,
-		accLevel is 1 to keep a timer going to track elapsed time, and to cycle on current time for short intervals. processor intensive, but more accurate
-		*/
+		accLevel is 1 to keep a timer going to track elapsed time, and to cycle on current time for short intervals. processor intensive, but more accurate  */
 		pulsedThread (unsigned int , unsigned int , unsigned int , void *  , int (*)(void *, void *  &), void (*)(void *), void (*)(void *), int , int &);
 		pulsedThread  (float , float , float , void *  , int (*)(void *, void * &), void (*)(void *), void (*)(void *), int , int &);
 		virtual ~pulsedThread();
+		/* ********************* Requesting a task and checking if we are doinga task ***********************************************************/
 		void DoTask (void); // requests that the thread perform its task once, as currently configured, if not an infinite train, or will start an infinite train
 		void DoTasks (unsigned int nTasks); // requests that the thread perform its task nTasks times, as currently configured, or
 		int isBusy(); // checks if a task is busy, returns how many tasks are left to do
@@ -219,41 +243,41 @@ class pulsedThread{
 		// for infinite trains
 		void startInfiniteTrain(void);  // starts an infinite train
 		void stopInfiniteTrain (void); // stops an infinite train
-		// modifiers based on individual pulses
+		/* *********************************** Modifying  and Checking Timing by Pulse Time  ****************************************************************/
 		int modDelay (unsigned int newDelay); // sets delay time, before pulse, in microseconds. 0 means no delay
 		int modDur (unsigned int newDur); // sets pulse duration, in microseconds,
 		int modTrainLength (unsigned int newTicks); // sets number of pulses in a train. if set to 0 or 1, switches mode to infinite train or single pulse
-		// modifiers based on timing
-		int modTrainDur (float newDur); // changes duration of pulse train, in seconds (if not an infinite train)
-		int modFreq (float newFreq); // changes frequency (Hz) of train. Duration and duty cycle will not be changed
-		int modDutyCycle (float newDutyCycle); //changes duty cycle (as for PWM), frequency and duration unchanged
-		// custom modifier for custom data, you need to provide the modifier data and the modifier function
-		int modCustom (int (*modFunc)(void *, taskParams *), void * modData, int isLocking);
-		// returns 1 if waiting for the pthread to do a requested modification
-		int getModCustomStatus (void);
-		// gets a pointer to custom data, allows you to examine and modify custom data directly - don't modifiy when thread is running, use modCustom for that
-		void setCustomDataDelFunc  (void (*delFunc)( void *)); // sets a function that will be run when a pulsedThread is about to be killed
-		void * getCustomData (void); // returns a pointer to the custom data. 
-		// setters for low, high, and end functions
-		void setLowFunc (void (*loFunc)(void *)); // sets the function that is called on low part of cycle
-		void setHighFunc (void (*hiFunc)(void *)); // sets the function that is called on high part of cycle
-		void setEndFunc (void (*endFunc)(taskParams *)); // sets the function that is called after each pulse, or after each train,gets pointer to the task
-		void unSetEndFunc (void); //removes end func, replaces with nullptr
-		int hasEndFunc  (void); // returns 1 if an endFunc is installed, else 0
-		// getters for timing params in pulses
 		unsigned int getNpulses (void); // will be 0 for infiniteTrain
 		int getpulseDurUsecs (void); // in microseconds
 		int getpulseDelayUsecs (void); // in microseconds, can be 0
-		// getters for train based timing params
+		/* *********************************** Modifying and Checking Timing by Frequency and Duty Cycle  *******************************/
+		int modTrainDur (float newDur); // changes duration of pulse train, in seconds (if not an infinite train)
+		int modFreq (float newFreq); // changes frequency (Hz) of train. Duration and duty cycle will not be changed
+		int modDutyCycle (float newDutyCycle); //changes duty cycle (as for PWM), frequency and duration unchanged
 		float getTrainDuration (void); // train duration in seconds
 		float getTrainFrequency (void); //  train frequency in Hz
 		float getTrainDutyCycle (void); // duty cycle, dur/(dur + delay)
-		
+		/* ********** Modifying custom data (taskData or endFunc data) with provided modifier data and modifier function ***************/
+		int modCustom (int (*modFunc)(void *, taskParams *), void * modData, int isLocking); // for either taskData or endFunc data
+		int getModCustomStatus (void); // returns 1 if waiting for the pthread to do a requested modification for either taskData or endFunc data
+		float * cosineDutyCycleArray  (unsigned int arraySize, unsigned int period, float offset, float scaling); //Utility function to return an array containing a cosine wave useful for pulsedThreadDutyCycleFromArrayEndFunc 
+		int setUpEndFuncArray (float * newData, unsigned int nData, int isLocking);
+		/* ************* checking task data and Hi and Lo functions ******************************************************************/
+		void setLowFunc (void (*loFunc)(void *)); // sets the function that is called on low part of cycle
+		void setHighFunc (void (*hiFunc)(void *)); // sets the function that is called on high part of cycle
+		void setTaskDataDelFunc  (void (*delFunc)( void *)); // sets a function that will be run when a pulsedThread is about to be killed
+		void * getTaskData (void); // returns a pointer to the custom data for the task
+		/* ********************************* setting and unsetting endFunction **********************************************/
+		void setEndFunc (void (*endFunc)(taskParams *)); // sets the function that is called after each pulse, or after each train,gets pointer to the task
+		void unSetEndFunc (void); //removes end func, replaces with nullptr
+		int hasEndFunc  (void); // returns 1 if an endFunc is installed, else 0
+		void setEndFuncDataDelFunc  (void (*delFunc)( void *)); // sets a function that will be run when a pulsedThread is about to be killed
 	protected:
-		// thread variables - thread, mutex, condition variable, and task variables are all in the taskParams structure
-		struct taskParams theTask;
-		// function pointer for  function to run to delete taskCustom data, gets passed pointer to custom data. never used by pthread so not in taskParams
-		void (*delCustomDataFunc)( void *); 
+		/* *******************************taskParams structure ***********************************************************************************/
+		struct taskParams theTask;  // thread, mutex, condition variable, and task variables are all in theTask 
+		/* ********************************* function pointers for destructor to run ******************************************************/
+		void (*delTaskDataFunc)( void *); // deletes custom Task Data used by Hifunc and LoFunc
+		void (*delEndFuncDataFunc) (void *); // deletes custom data used by endFunc
 };
-
+ 
 #endif // PULSEDTHREAD_H

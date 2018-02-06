@@ -1,85 +1,5 @@
 #include "pulsedThread.h"
 
-
- /* *************************************CallBacks for EndFunctions using an Array of values  *************
-Functions for using an array of values for frequency or duty cycle with an endFunc to cycle through the array using pulsedThreadArrayStruct
-EndFuncData is pulsedThreadArrayStructPtr includes
-float * arrayData
-unsigned int startPos
-unsigned int endPos
-unsigned int arrayPos 
-
-***************************** Custom dataMod Callback**********************************
- Sets up the array of data used to output new values for frequency, duty cycle
-Use with pulsedThread::modCustom
-last modified:
-2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data
-2017/03/02 by Jamie Boyd - initial version */
-int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask){
-	// cast modData to a pulsedThreadArrayStructPtr
-	pulsedThreadArrayStructPtr modDataP = (pulsedThreadArrayStructPtr)modData;
-	// make a new pulsedThreadArrayStruct , and point endFuncDataPtr at it
-	pulsedThreadArrayStructPtr endFuncDataPtr = new pulsedThreadArrayStruct;
-	theTask->endFuncData = endFuncDataPtr;
-	// copy over the data from modData
-	endFuncDataPtr -> arrayData = modDataP->arrayData; // Don't copy data, just pointer to the data. So calling function must not delete arrayData while the thread is active
-	endFuncDataPtr -> startPos = modDataP->startPos; // position in the array to output
-	endFuncDataPtr -> endPos = modDataP->endPos; // number of points in the array
-	endFuncDataPtr -> arrayPos = modDataP->arrayPos; // position in the array to output
-	// delete modData
-	delete ((pulsedThreadArrayStructPtr)modData);
-	return 0;
-} 
-
-/* ************************ EndFunc sets Train Frequency from Array in endFunc data ***************************************
-last Modified:
-2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data */
-void pulsedThreadFreqFromArrayEndFunc (taskParams * theTask){
-	// cast endFunc data pointer to pulsedThreadArrayStructPtr
-	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)theTask->endFuncData;
-	// move to next point in array and warap to start if needed
-	ArrayStructPtr->arrayPos +=1;
-	if(ArrayStructPtr->arrayPos == ArrayStructPtr->endPos){
-		ArrayStructPtr->arrayPos =ArrayStructPtr->startPos;
-	}
-	// use times2Ticks to update taskParams with new timing values
-	times2Ticks (ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos], theTask->trainDutyCycle, theTask->trainDuration, *theTask);
-	theTask->trainFrequency = ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos];
-	// set high order signal bits of doTask that pulse duration and delay have changed
-	theTask->doTask |= (kMODDUR | kMODDELAY);
-}
-
-/* ************************ EndFunc sets Train Duty Cycle from Array in endFunc data ***************************************
-last Modified:
-2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data */
-void pulsedThreadDutyCycleFromArrayEndFunc (taskParams * theTask){
-	// cast endFunc data pointer to pulsedThreadArrayStructPtr
-	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)theTask->endFuncData;
-	// move to next point in array and warap to start if needed
-	ArrayStructPtr->arrayPos +=1;
-	if(ArrayStructPtr->arrayPos == ArrayStructPtr->endPos){
-		ArrayStructPtr->arrayPos =ArrayStructPtr->startPos;
-	}
-	// use times2Ticks to update taskParams with new timing values
-	times2Ticks (theTask->trainFrequency, ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos], theTask->trainDuration, *theTask);
-	theTask->trainDutyCycle = ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos];;
-	theTask->doTask |= (kMODDUR | kMODDELAY);
-}
-
- /* **************************************************
- * delete function for endFunc data ONLY for a task using pulsedThreadArrayStruct,
- *  called when pulsedThread is killed if you explicitly install it with
- *  pulsedThread::setendFuncDataDelFunc
- * last modified:
-
- * 2017/12/06 by Jamie Boyd - initial version */
- void pulsedThreadArrayStructCustomDel (void * endFuncData){
-	 if (endFuncData != nullptr){
-		 pulsedThreadArrayStructPtr ArrayStructPtr = (pulsedThreadArrayStructPtr) endFuncData;
-		 delete (ArrayStructPtr);
-	 }
- }
-
 /* ************** the thread function needs to be a C-style function, not a class method ********************************************************
 ****************************************************************************************************************************************************
 Last Modified:
@@ -347,6 +267,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
     }
     return NULL;
 }
+
 
 
 /* ********************************************* pulsedThead Class Methods*******************************************************************************
@@ -851,3 +772,82 @@ pulsedThread::~pulsedThread(){
 		delEndFuncDataFunc (theTask.endFuncData);
 	}
 }
+
+ /* *************************************CallBacks for EndFunctions using an Array of values  *************
+Functions for using an array of values for frequency or duty cycle with an endFunc to cycle through the array using pulsedThreadArrayStruct
+EndFuncData is pulsedThreadArrayStructPtr includes
+float * arrayData
+unsigned int startPos
+unsigned int endPos
+unsigned int arrayPos 
+
+***************************** EndFunc dataMod Callback**********************************
+ Sets up the array of data used to output new values for frequency, duty cycle
+Use with pulsedThread::modCustom
+last modified:
+2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data
+2017/03/02 by Jamie Boyd - initial version */
+int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask){
+	// cast modData to a pulsedThreadArrayStructPtr
+	pulsedThreadArrayStructPtr modDataP = (pulsedThreadArrayStructPtr)modData;
+	// make a new pulsedThreadArrayStruct , and point endFuncDataPtr at it
+	pulsedThreadArrayStructPtr endFuncDataPtr = new pulsedThreadArrayStruct;
+	theTask->endFuncData = endFuncDataPtr;
+	// copy over the data from modData
+	endFuncDataPtr -> arrayData = modDataP->arrayData; // Don't copy data, just pointer to the data. So calling function must not delete arrayData while the thread is active
+	endFuncDataPtr -> startPos = modDataP->startPos; // position in the array to output
+	endFuncDataPtr -> endPos = modDataP->endPos; // number of points in the array
+	endFuncDataPtr -> arrayPos = modDataP->arrayPos; // position in the array to output
+	// delete modData
+	delete ((pulsedThreadArrayStructPtr)modData);
+	return 0;
+} 
+
+/* ************************ EndFunc sets Train Frequency from Array in endFunc data ***************************************
+last Modified:
+2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data */
+void pulsedThreadFreqFromArrayEndFunc (taskParams * theTask){
+	// cast endFunc data pointer to pulsedThreadArrayStructPtr
+	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)theTask->endFuncData;
+	// move to next point in array and warap to start if needed
+	ArrayStructPtr->arrayPos +=1;
+	if(ArrayStructPtr->arrayPos == ArrayStructPtr->endPos){
+		ArrayStructPtr->arrayPos =ArrayStructPtr->startPos;
+	}
+	// use times2Ticks to update taskParams with new timing values
+	times2Ticks (ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos], theTask->trainDutyCycle, theTask->trainDuration, *theTask);
+	theTask->trainFrequency = ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos];
+	// set high order signal bits of doTask that pulse duration and delay have changed
+	theTask->doTask |= (kMODDUR | kMODDELAY);
+}
+
+/* ************************ EndFunc sets Train Duty Cycle from Array in endFunc data ***************************************
+last Modified:
+2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data */
+void pulsedThreadDutyCycleFromArrayEndFunc (taskParams * theTask){
+	// cast endFunc data pointer to pulsedThreadArrayStructPtr
+	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)theTask->endFuncData;
+	// move to next point in array and warap to start if needed
+	ArrayStructPtr->arrayPos +=1;
+	if(ArrayStructPtr->arrayPos == ArrayStructPtr->endPos){
+		ArrayStructPtr->arrayPos =ArrayStructPtr->startPos;
+	}
+	// use times2Ticks to update taskParams with new timing values
+	times2Ticks (theTask->trainFrequency, ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos], theTask->trainDuration, *theTask);
+	theTask->trainDutyCycle = ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos];;
+	theTask->doTask |= (kMODDUR | kMODDELAY);
+}
+
+ /* **************************************************
+ * delete function for endFunc data ONLY for a task using pulsedThreadArrayStruct,
+ *  called when pulsedThread is killed if you explicitly install it with
+ *  pulsedThread::setendFuncDataDelFunc
+ * last modified:
+
+ * 2017/12/06 by Jamie Boyd - initial version */
+ void pulsedThreadArrayStructCustomDel (void * endFuncData){
+	 if (endFuncData != nullptr){
+		 pulsedThreadArrayStructPtr ArrayStructPtr = (pulsedThreadArrayStructPtr) endFuncData;
+		 delete (ArrayStructPtr);
+	 }
+ }

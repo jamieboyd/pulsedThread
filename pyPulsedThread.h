@@ -69,7 +69,6 @@ static PyObject* pulsedThread_stopTrain (PyObject *self, PyObject *PyPtr) {
     Py_RETURN_NONE;
 }
 
-
 /* ---------Modifiers for pulse timing based on individual pulses and numbers of pulses--------------
 Modifies the delay of a pulse, or the "low" time of a train, value is in seconds*/
 static PyObject*  pulsedThread_modDelay (PyObject *self, PyObject *args) {
@@ -185,6 +184,105 @@ static PyObject* pulsedThread_hasEndFunc (PyObject *self, PyObject *PyPtr) {
 static PyObject* pulsedThread_UnSetEndFunc (PyObject *self, PyObject *PyPtr) {
 	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));	
 	threadPtr->unSetEndFunc ();
+	Py_RETURN_NONE;
+}
+
+
+/* *************************************** Support for Python Objects providing Hi, Lo, and endFuncs ********************************* /
+
+/* Runs PyObject.HiFunc()  taskData is assumed to be a pointer to a python object that has methods called HiFunc and loFunc that take no arguments */
+static void pulsedThread_RunPythonHiFunc (void * taskData){
+	PyObject *PyObjPtr = (PyObject *) taskData;
+	PyGILState_STATE state=PyGILState_Ensure();
+	PyObject *result = PyObject_CallMethod (PyObjPtr, "HiFunc", NULL);
+	Py_DECREF (result);
+	PyGILState_Release(state);
+}
+
+// Runs PyObject.LoFunc()  taskData is assumed to be a pointer to a python object that has methods called HiFunc and LoFunc that take no arguments
+static void pulsedThread_RunPythonLoFunc (void * taskData){
+	PyObject *PyObjPtr = (PyObject *) taskData;
+	PyGILState_STATE state=PyGILState_Ensure();
+	PyObject *result = PyObject_CallMethod (PyObjPtr, "LoFunc", NULL);
+	Py_DECREF (result);
+	PyGILState_Release(state);
+}
+
+// Runs PyObject.endFunc()  taskData is assumed to be a pointer to a python object that has a method called endFunc that takes 4 int arguments 
+static void pulsedThread_RunPythonEndFunc_p (taskParams * theTask){
+	PyObject *PyObjPtr = (PyObject *) theTask->endFuncData;
+	PyGILState_STATE state=PyGILState_Ensure();
+	PyObject *result = PyObject_CallMethod (PyObjPtr, "EndFunc", "(iiii)",theTask->pulseDelayUsecs, theTask->pulseDurUsecs, theTask->nPulses, theTask->doTask);
+	Py_DECREF (result);
+	PyGILState_Release(state);
+}
+
+// Runs PyObject.endFunc(frequency, dutyCycle, train Duration, doTask)  taskData is assumed to be a pointer to a python object that has a method called EndFunc that takes 3 float arguments and 1 int arguments
+static void pulsedThread_RunPythonEndFunc_f (taskParams * theTask){
+	PyObject *PyObjPtr = (PyObject *) theTask->endFuncData;
+	PyGILState_STATE state=PyGILState_Ensure();
+	PyObject *result = PyObject_CallMethod (PyObjPtr, "EndFunc", "(fffi)",theTask->trainFrequency, theTask->trainDutyCycle, theTask->trainDuration, theTask->doTask);
+	Py_DECREF (result);
+	PyGILState_Release(state);
+}
+
+
+// installs pulsedThread_RunPythonEndFunc, either interger or float version,  as the endFunc, calling the endFunc of the same Python object used for HI and LO funcs
+// the modFunc that is passed to pulsedThread->modCustom so we change the object when thread is not busy
+int pulsedThread_modEndFuncObj (void * pyObjPtr, taskParams * taskDataP){
+	taskDataP->endFuncData = pyObjPtr;
+	return 0;
+}
+
+static PyObject* pulsedThread_SetPythonEndFuncObj (PyObject *self, PyObject *args) {
+	PyObject *PyPtr;		// first argument is the Python pyCapsule that points to the pulsedThread
+	PyObject *PyObjPtr;		// second argument is a Python object that better have an endFunc 
+	int endFuncPulseDesc;	// 0 for calling endFunc with frequency,duration,train length info, non-zero for microseond pulse delay, duration, and pulse number description
+	if (!PyArg_ParseTuple(args,"OOi", &PyPtr, &PyObjPtr, &endFuncPulseDesc)) {
+		PyRun_SimpleString ("print (' error')");
+		return NULL;
+	}
+	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
+	// set the endFunc data to the object
+	threadPtr->modCustom (&pulsedThread_modEndFuncObj, (void *) PyObjPtr, 0);
+	
+	if (endFuncPulseDesc == 0){
+		threadPtr->setEndFunc (&pulsedThread_RunPythonEndFunc_f);
+	}else{
+		threadPtr->setEndFunc (&pulsedThread_RunPythonEndFunc_p);
+	}
+	// Activate Python Thread Awareness
+	if (!PyEval_ThreadsInitialized()){
+		PyEval_InitThreads();
+	}
+	Py_RETURN_NONE;
+}
+
+
+// the modFunc that is passed to pulsedThread->modCustom
+int pulsedThread_modTaskObj (void * pyObjPtr, taskParams * taskDataP){
+	taskDataP->taskData = pyObjPtr;
+	return 0;
+}
+
+// changes the object that is used when calling LO func and HI func, or when calling  endFunc
+static PyObject* pulsedThread_SetPythonTaskObj (PyObject *self, PyObject *args) {
+	PyObject *PyPtr;		// first argument is the Python pyCapsule that points to the pulsedThread
+	PyObject *PyObjPtr;		// second argument is a Python object that better have HI and LO Functions
+	if (!PyArg_ParseTuple(args,"OO", &PyPtr, &PyObjPtr)) {
+		PyRun_SimpleString ("print (' error')");
+		return NULL;
+	}
+	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
+	// set the high and low functions
+	threadPtr->setLowFunc (&pulsedThread_RunPythonLoFunc); // sets the function that is called on low part of cycle
+	threadPtr->setHighFunc (&pulsedThread_RunPythonLoFunc); // sets the function that is called on high part of cycle
+	// set the task data to the object
+	threadPtr->modCustom (&pulsedThread_modTaskObj, (void *) PyObjPtr, 0);
+	// Activate Python Thread Awareness
+	if (!PyEval_ThreadsInitialized()){
+		PyEval_InitThreads();
+	}
 	Py_RETURN_NONE;
 }
 

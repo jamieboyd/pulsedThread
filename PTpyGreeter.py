@@ -25,6 +25,7 @@ as 0 and both threads think they have the mutex.
 """
 import ptPyFuncs
 from time import sleep as sleep
+from time import time as time
 
 class PT_Py_Greeter (object):
 
@@ -109,7 +110,13 @@ class PT_Py_Greeter (object):
         return ptPyFuncs.isBusy (self.task_ptr)
     
     def wait_greeting (self, delaySecs):
-        return ptPyFuncs.waitOnBusy (self.task_ptr, delaySecs)
+        """There is no ptPyFuncs.waitOnBusy because of the Global interpreter Lock.
+        This Python function would have the GIL and be waiting on C module ptPyFuncs
+        which was trying to get the GIL so it could call a Python function"""
+        endTime = time() + delaySecs
+        while ptPyFuncs.isBusy (self.task_ptr) and time() < endTime:
+            sleep (0.05)
+        return ptPyFuncs.isBusy (self.task_ptr) 
 
 
 if __name__ == '__main__':

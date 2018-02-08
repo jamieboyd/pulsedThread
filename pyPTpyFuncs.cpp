@@ -55,7 +55,6 @@ static PyObject* pulsedThreadPy_f (PyObject *self, PyObject *args) {
   /* Module method table - the first 22 methods are defined in pyPulsedThread.h*/
 static PyMethodDef ptPyFuncsMethods[]= {	
 	{"isBusy", pulsedThread_isBusy, METH_O, "returns number of tasks a thread has left to do, 0 means finished all tasks"},
-	{"waitOnBusy", pulsedThread_waitOnBusy, METH_VARARGS, "Returns when a thread is no longer busy, or after timeOut secs"},
 	{"doTask", pulsedThread_doTask, METH_O, "Tells the pulsedThread object to do whatever task it was configured for"},
 	{"doTasks", pulsedThread_doTasks, METH_VARARGS, "Tells the pulsedThread object to do whatever task it was configured for multiple times"},
 	{"startTrain", pulsedThread_startTrain, METH_O, "Tells a pulsedThread object configured as an infinite train to start"},

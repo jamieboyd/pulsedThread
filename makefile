@@ -35,7 +35,6 @@ clean:
 	rm -f $(TARGET_LIB)
 	rm -f Greeter
 
-
 build: all
 
 install: build

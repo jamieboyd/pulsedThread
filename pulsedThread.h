@@ -45,12 +45,11 @@ const int kINFINITETRAIN = 0; // calls hiFunc, waits for duration, if Delay > 0,
 /* *****************************************constants for task modification signals *******************************************************************
 The higher order bits of doTask in taskParams struct are reserved for flags, signalling that the task has been modified and that the thread should
 wake up and change timing paramaters.  Even with reserved bits, the number of tasks that can be requested can still be more
-than 16 million (2^24=16777216), which "should be enough for anybody"
-This leaves bits 28,29,30 and 31 for your own purposes, like signaling endFunction*/
-const unsigned int kMODDELAY = 33554432; //2^25
-const unsigned int kMODDUR = 67108864; //2^26
-const unsigned int kMODCUSTOM = 134217728;//2^27
-const unsigned int kMODANY = 234881024;//2^27 + 2^26 + 2^25
+than 500 million (2^29 -1 =536,870,911 which "should be enough for anybody" */
+const unsigned int kMODDELAY = 536870912; 		//2^29
+const unsigned int kMODDUR = 1073741824;		//2^30
+const unsigned int kMODCUSTOM = 2147483648;	//2^31
+const unsigned int kMODANY = 3221225530;		//2^29 + 2^30 + 2^31
 
 /* ***************this C-style struct contains all the relevant thread variables and task variables, and is passed to the thread function *********
 last modified:
@@ -66,11 +65,11 @@ struct taskParams {
 	float trainDuration; // duration of train, in seconds, or 0 for infinite train
 	float trainFrequency; // frequency in Hz, i.e., pulses/second
 	float trainDutyCycle; // pulseDurUsecs/(pulseDurUsecs + pulseDelayUsecs)
-	/* *****************************Hi and Lo functions, and pointer to thier custom data, ********************************/
-	void (*loFunc)(void *) ; // function to run for low part of pulse, gets pointer to taskData
-	void (*hiFunc)(void * );// function to run for high part of pulse, gets pointer to taskData
+	/* *****************************Hi and Lo functions, and pointer to their custom data, ********************************/
+	void (*loFunc)(void *, unsigned int) ; // function to run for low part of pulse, gets pointer to taskData
+	void (*hiFunc)(void *, unsigned int);// function to run for high part of pulse, gets pointer to taskData
 	void * taskData; // pointer to custom taskData for hi and lo functions
-	/* *************************** EndFuncion and pointer to its custom data *******************************************/
+	/* *************************** EndFunction and pointer to its custom data *******************************************/
 	void (*endFunc)(taskParams *); // runs at end of train, or end of each pulse for infinite train or single pulse, gets pointer to the whole task
 	void * endFuncData; // pointer for custom data for end functions
 	/* *************** function to mod custom data and pointer to data to use with mod function ***********************/

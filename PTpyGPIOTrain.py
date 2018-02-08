@@ -3,7 +3,7 @@
 
 """More testing code for ptPyFuncs - allows you to use pulsedThread C++ class with HiFunc/LoFunc and, optionally,
 endFunc from a Python object. Most of the functions in ptPyFuncs are wrappers for functions
-defined in pyPulsedThread.h. PT_Py_GPIO_train provides a simple example using  ptPyFuncs
+defined in pyPulsedThread.h. PT_Py_GPIO_train provides a simple example using ptPyFuncs
 with RPi.GPIO to time trains of pulses output on Raspberry Pi GPIO pins
 """
 
@@ -82,6 +82,6 @@ if __name__ == '__main__':
     GPIO.setwarnings(False)
     train1 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 60, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS, 23)
     train1.TurnOnEndFunc (100)
-    train1.DoTrains (1000)
+    train1.DoTrains (200)
     train1.WaitOnBusy (10)
     del (train1)

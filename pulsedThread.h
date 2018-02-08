@@ -66,8 +66,8 @@ struct taskParams {
 	float trainFrequency; // frequency in Hz, i.e., pulses/second
 	float trainDutyCycle; // pulseDurUsecs/(pulseDurUsecs + pulseDelayUsecs)
 	/* *****************************Hi and Lo functions, and pointer to their custom data, ********************************/
-	void (*loFunc)(void *, unsigned int) ; // function to run for low part of pulse, gets pointer to taskData
-	void (*hiFunc)(void *, unsigned int);// function to run for high part of pulse, gets pointer to taskData
+	void (*loFunc)(void *) ; // function to run for low part of pulse, gets pointer to taskData
+	void (*hiFunc)(void *); // function to run for high part of pulse, gets pointer to taskData
 	void * taskData; // pointer to custom taskData for hi and lo functions
 	/* *************************** EndFunction and pointer to its custom data *******************************************/
 	void (*endFunc)(taskParams *); // runs at end of train, or end of each pulse for infinite train or single pulse, gets pointer to the whole task
@@ -184,12 +184,12 @@ inline int ticks2Times (unsigned int pulseDelay, unsigned int pulseDuration, uns
 		return 1;
 	}
 
-	/*if (((theTask.nPulses == kINFINITETRAIN) && (nPulses != kINFINITETRAIN)) && (theTask.doTask & 1)){
+	if (((theTask.nPulses == kINFINITETRAIN) && (nPulses != kINFINITETRAIN)) && (theTask.doTask & 1)){
 #if beVerbose
 		printf ("ticks2Times error, infinite train with task not stopped: current length = %d and new length = %d\n", theTask.nPulses, nPulses);
 #endif
 		return 1;
-	}*/
+	}
 	float pulseTime = float(pulseDelay + pulseDuration)/1e06;
 	theTask.trainFrequency = 1/pulseTime;
 	theTask.trainDuration = pulseTime * nPulses;
@@ -233,8 +233,8 @@ class pulsedThread{
 		errCode is a reference variable that returns 1 if input was not ok, else 0. Should really throw an exception....
 		accLevel is 0 to trust nanosleep for the timing - may not be as accurate, but less processor intenisve, good for up to a couple hundred Hz,
 		accLevel is 1 to keep a timer going to track elapsed time, and to cycle on current time for short intervals. processor intensive, but more accurate  */
-		pulsedThread (unsigned int , unsigned int , unsigned int , void *  , int (*)(void *, void *  &), void (*)(void *), void (*)(void *), int , int &);
-		pulsedThread  (float , float , float , void *  , int (*)(void *, void * &), void (*)(void *), void (*)(void *), int , int &);
+		pulsedThread (unsigned int, unsigned int, unsigned int, void *  , int (*)(void *, void *  &), void (*)(void *), void (*)(void *), int , int &);
+		pulsedThread  (float, float, float, void *, int (*)(void *, void * &), void (*)(void *), void (*)(void *), int , int &);
 		virtual ~pulsedThread();
 		/* ********************* Requesting a task and checking if we are doinga task ***********************************************************/
 		void DoTask (void); // requests that the thread perform its task once, as currently configured, if not an infinite train, or will start an infinite train

@@ -91,7 +91,7 @@ typedef struct pulsedThreadArrayStruct{
 }pulsedThreadArrayStruct, *pulsedThreadArrayStructPtr;
 
 
-/* *************************** Function Declarations for non-thread Functions **********************************/
+/* *************************** Function Declarations for non-class Functions used by pthread **********************************/
 int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask);
 void pulsedThreadFreqFromArrayEndFunc (taskParams * theTask);
 void pulsedThreadDutyCycleFromArrayEndFunc (taskParams * theTask);
@@ -263,11 +263,14 @@ class pulsedThread{
 		int getModCustomStatus (void); // returns 1 if waiting for the pthread to do a requested modification for either taskData or endFunc data
 		float * cosineDutyCycleArray  (unsigned int arraySize, unsigned int period, float offset, float scaling); //Utility function to return an array containing a cosine wave useful for pulsedThreadDutyCycleFromArrayEndFunc 
 		int setUpEndFuncArray (float * newData, unsigned int nData, int isLocking);
+		void getTaskMutex (void);
+		void giveUpTaskMutex (void);
+		void * getTaskData (void); // returns a pointer to the custom data for the task
+		void * getEndFuncData (void); // returns a pointer to the endFunc data for the task
 		/* ************* checking task data and Hi and Lo functions ******************************************************************/
 		void setLowFunc (void (*loFunc)(void *)); // sets the function that is called on low part of cycle
 		void setHighFunc (void (*hiFunc)(void *)); // sets the function that is called on high part of cycle
 		void setTaskDataDelFunc  (void (*delFunc)( void *)); // sets a function that will be run when a pulsedThread is about to be killed
-		void * getTaskData (void); // returns a pointer to the custom data for the task
 		/* ********************************* setting and unsetting endFunction **********************************************/
 		void setEndFunc (void (*endFunc)(taskParams *)); // sets the function that is called after each pulse, or after each train,gets pointer to the task
 		void unSetEndFunc (void); //removes end func, replaces with nullptr
@@ -280,5 +283,5 @@ class pulsedThread{
 		void (*delTaskDataFunc)( void *); // deletes custom Task Data used by Hifunc and LoFunc
 		void (*delEndFuncDataFunc) (void *); // deletes custom data used by endFunc
 };
- 
+
 #endif // PULSEDTHREAD_H

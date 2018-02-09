@@ -684,6 +684,24 @@ int pulsedThread::modCustom (int (*modFunc)(void *, taskParams * ), void * modDa
 	}
 }
 
+/* ****************** Mutex access if you want to change taskData directly ******************************
+you need to have a pointer to the taskData, or endFunc data, if you want to so this
+
+ *****************Gets the Mutex ****************************************
+Last Modified:
+2018/02/08 by Jamie boyd - initial Version */
+void pulsedThread::getTaskMutex (void){
+	pthread_mutex_lock (&theTask.taskMutex);
+}
+
+/* *****************Gives up the Mutex ****************************************
+Last Modified:
+2018/02/08 by Jamie boyd - initial Version */
+void pulsedThread::giveUpTaskMutex (void){
+	pthread_mutex_unlock (&theTask.taskMutex);
+}
+
+
 /* *******************************************************************************************************
 Returns 1 if a pulsedThread has requested a custom data modification form the pthread, but it has
 not been completed. If no request is pending, returns 0.
@@ -700,7 +718,7 @@ int pulsedThread::getModCustomStatus (void){
 
 /* sets pointer to a function to delete customData when pulsedThread is killed */
 void pulsedThread::setTaskDataDelFunc  (void (*delFunc)( void *)){
-	this->delTaskDataFunc = delFunc;
+	delTaskDataFunc = delFunc;
 }
 
 unsigned int pulsedThread::getNpulses (void){
@@ -718,6 +736,11 @@ int pulsedThread::getpulseDelayUsecs (void){
 // returns pointer to task custom data
 void * pulsedThread::getTaskData (void){
 	return theTask.taskData;
+}
+
+// returns pointer to task endFunc data
+void * pulsedThread::getEndFuncData (void){
+	return theTask.endFuncData;
 }
 
 // train duration in seconds

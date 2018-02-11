@@ -420,6 +420,19 @@ void pulsedThread::DoTasks(unsigned int nTasks){
 	pthread_mutex_unlock( &theTask.taskMutex );
 }
 
+/************* countermands currently requested tasks ***************************************
+ The thread will finish the current pulse or train of pulses then stop
+ Last Modified:
+ 2018/02/09 by Jamie Boyd - initial Version */
+void pulsedThread::UnDoTasks (void){
+    if (theTask.doTask &~kMODANY) {
+        pthread_mutex_lock (&theTask.taskMutex);
+        theTask.doTask &= kMODANY;
+        pthread_cond_signal(&theTask.taskVar);
+        pthread_mutex_unlock( &theTask.taskMutex);
+    }
+}
+
 /* ****************************************************************************************************
 /returns 0 if a thread is not currently doing a task, else returns number of tasks still left to do
 Last Modified 2015/09/28 by Jamie Boyd -  initial verison */
@@ -474,7 +487,7 @@ Last Modified 2015/09/28 by Jamie Boyd */
 void pulsedThread::stopInfiniteTrain (){
 	if ((theTask.nPulses == kINFINITETRAIN) && (theTask.doTask &~kMODANY)) {
 		pthread_mutex_lock (&theTask.taskMutex);
-		theTask.doTask -= 1;
+		theTask.doTask &= kMODANY;
 		pthread_cond_signal(&theTask.taskVar);
 		pthread_mutex_unlock( &theTask.taskMutex);
 	}

@@ -26,7 +26,7 @@ Last Modified:
 
 
  /* ***define beVerbose to non-zero to print out messages that may be useful for debugging or understanding how the code runs ****/
- #define beVerbose 1
+ #define beVerbose 0
  #if beVerbose
  #include <stdio.h>
 #endif
@@ -239,7 +239,8 @@ class pulsedThread{
 		/* ********************* Requesting a task and checking if we are doinga task ***********************************************************/
 		void DoTask (void); // requests that the thread perform its task once, as currently configured, if not an infinite train, or will start an infinite train
 		void DoTasks (unsigned int nTasks); // requests that the thread perform its task nTasks times, as currently configured, or
-		int isBusy(); // checks if a task is busy, returns how many tasks are left to do
+        void UnDoTasks (void); // zeros requested tasks in doTask. Thread stops after current task
+        int isBusy(); // checks if a task is busy, returns how many tasks are left to do
 		int waitOnBusy(float timeOut); // doesn't return until a thread is no longer busy
 		// for infinite trains
 		void startInfiniteTrain(void);  // starts an infinite train

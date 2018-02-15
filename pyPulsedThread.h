@@ -281,7 +281,7 @@ int pulsedThread_modTaskObj (void * pyObjPtr, taskParams * taskDataP){
 	return 0;
 }
 
-// changes the object that is used when calling LO func and HI func, or when calling  endFunc
+// changes the object that is used when calling LO func and HI funcc
 static PyObject* pulsedThread_SetPythonTaskObj (PyObject *self, PyObject *args) {
 	PyObject *PyPtr;		// first argument is the Python pyCapsule that points to the pulsedThread
 	PyObject *PyObjPtr;		// second argument is a Python object that better have HI and LO Functions
@@ -301,4 +301,82 @@ static PyObject* pulsedThread_SetPythonTaskObj (PyObject *self, PyObject *args) 
 	}
 	Py_RETURN_NONE;
 }
+
+/*Function for passing an array to a train or pulse, and selecting one of the C++ endFunc that sets dutyCycle or Frequency from the array */
+static PyObject* pulsedThread_setArrayFunc (PyObject *self, PyObject *args) {
+	PyObject * PyPtr;	// pulsed thread object, either a train or a pulse
+	PyObject * bufferObj; // the floating point array of dutyCycles or Frequencies
+	int endFuncType;  // 0 for frequency, 1 for dutyCycle
+	int isLocking; 
+	
+	if (!PyArg_ParseTuple(args,"OOii", &PyPtr, &bufferObj, &endFuncType, &isLocking)) {
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer, floating point buffer, and endFunction type code.");
+		return NULL;
+	}
+	if (PyObject_CheckBuffer (bufferObj) == 0){
+		PyErr_SetString (PyExc_RuntimeError, "Error getting bufferObj from Python array.");
+		return NULL;
+	}
+	Py_buffer buffer;
+	if (PyObject_GetBuffer (bufferObj, &buffer, PyBUF_FORMAT)==-1){
+		PyErr_SetString (PyExc_RuntimeError,"Error getting C array from bufferObj from Python array");
+		return NULL;
+	}
+	//printf ("Buffer type is %s, length is %d bytes, and item size is %d.\n", buffer.format, buffer.len, buffer.itemsize);
+	if (strcmp (buffer.format, "f") != 0){
+		PyErr_SetString (PyExc_RuntimeError, "Error for bufferObj: data type of Python array is not float");
+		return NULL;
+	}
+	
+	float* arrayStart = static_cast <float *>(buffer.buf); // Now we have a pointer to the array from the passed in buffer
+	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread")); // get pointer to pulsedThread
+	errVar = threadPtr->setUpEndFuncArray (arrayStart, (unsigned int) buffer.len/buffer.itemsize, isLocking);	
+	//int errVar = SimpleGPIO_setUpArray (threadPtr, arrayStart, (unsigned int) buffer.len/buffer.itemsize, isLocking); // adds a pointer to the array to the endFunc data
+	if (errVar){
+		PyErr_SetString (PyExc_RuntimeError, "Failed to set up the array for the endFunction");
+		return NULL;
+	}
+	// install the endFunction that updates the duty cycle or frequency after every train of pulses
+	if (endFuncType ==0){
+		threadPtr->setEndFunc (&pulsedThreadDutyCycleFromArrayEndFunc);
+	}else{
+		threadPtr->setEndFunc (&pulsedThreadFreqFromArrayEndFunc);
+	}
+	PyBuffer_Release (&buffer); // we don't need the buffer object as we have a pointer to the array start, which is all we care about
+	Py_RETURN_NONE;
+}
+
+static PyObject* pulsedThread_cosineDutyCycleArray (PyObject *self, PyObject *args) {
+	PyObject * bufferObj; // a floating point array
+	unsigned int period;
+	float offset;
+	float scaling;
+	
+	if (!PyArg_ParseTuple(args,"OIff", &bufferObj, &period, &offset, &scaling)){
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for floating point array, cos period, offset, and scaling");
+		return NULL;
+	}
+	if (PyObject_CheckBuffer (bufferObj) == 0){
+		PyErr_SetString (PyExc_RuntimeError, "Error getting bufferObj from Python array.");
+		return NULL;
+	}
+	Py_buffer buffer;
+	if (PyObject_GetBuffer (bufferObj, &buffer, PyBUF_FORMAT)==-1){
+		PyErr_SetString (PyExc_RuntimeError,"Error getting C array from bufferObj from Python array");
+		return NULL;
+	}
+	//printf ("Buffer type is %s, length is %d bytes, and item size is %d.\n", buffer.format, buffer.len, buffer.itemsize);
+	if (strcmp (buffer.format, "f") != 0){
+		PyErr_SetString (PyExc_RuntimeError, "Error for bufferObj: data type of Python array is not float");
+		return NULL;
+	}
+	float* arrayData = static_cast <float *>(buffer.buf); // Now we have a pointer to the array from the passed in buffer	
+	int errVar = cosineDutyCycleArray  (arrayData, (unsigned int) buffer.len/buffer.itemsize, period,  offset,  scaling);
+	if (errVar){
+		PyErr_SetString (PyExc_RuntimeError, "Adjust offset and scaling so cosine is bounded by 0 and 1");
+		return NULL;
+	}
+	Py_RETURN_NONE;
+}
+
 #endif

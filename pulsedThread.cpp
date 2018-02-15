@@ -662,20 +662,18 @@ int pulsedThread::hasEndFunc  (void){
 	}
 }
 
-float * pulsedThread::cosineDutyCycleArray (unsigned int arraySize, unsigned int period, float offset, float scaling){
+int cosineDutyCycleArray  (float * arrayData, unsigned int arraySize, unsigned int period, float offset, float scaling){
 	const double phi = 6.2831853071794;
 	if (((offset - scaling ) < 0) || ((offset + scaling) > 1)){
 #if beVerbose
 		printf ("adjust offset and scaling so cosine is bounded by 0 and 1/n");
 #endif
-		return nullptr;
+		return 1;
 	}
-	// make an array to output
-	float * arrayData = new float [arraySize];
 	for (unsigned int ii=0; ii< arraySize; ii +=1){
 		arrayData [ii] = offset -  scaling * cos (phi * (double)(ii % period)/period);
 	}
-	return arrayData;
+	return 0;
 }
 
 /* ****************************************************************************************************
@@ -718,7 +716,7 @@ void pulsedThread::giveUpTaskMutex (void){
 
 
 /* *******************************************************************************************************
-Returns 1 if a pulsedThread has requested a custom data modification form the pthread, but it has
+Returns 1 if a pulsedThread has requested a custom data modification from the pthread, but it has
 not been completed. If no request is pending, returns 0.
 Last Modified:
 2017/11/29 by Jamie Boyd - first version
@@ -832,7 +830,7 @@ int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask){
 	pulsedThreadArrayStructPtr endFuncDataPtr = new pulsedThreadArrayStruct;
 	theTask->endFuncData = endFuncDataPtr;
 	// copy over the data from modData
-	endFuncDataPtr -> arrayData = modDataP->arrayData; // Don't copy data, just pointer to the data. So calling function must not delete arrayData while the thread is active
+	endFuncDataPtr -> arrayData = modDataP->arrayData; // Don't copy data, just pointer to the data. So calling function must not delete arrayDat while the thread is active
 	endFuncDataPtr -> startPos = modDataP->startPos; // position in the array to output
 	endFuncDataPtr -> endPos = modDataP->endPos; // number of points in the array
 	endFuncDataPtr -> arrayPos = modDataP->arrayPos; // position in the array to output

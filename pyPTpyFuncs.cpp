@@ -1,6 +1,4 @@
 #include <pyPulsedThread.h>
-
-
 /**********************************************************************************************************************************
 These 2 functions make a pulsedThread object that runs Python callbacks for the high and low functions from a Python object 
 Because the only data is a single pointer to a Python object, no need for an initFunc */
@@ -15,14 +13,14 @@ static PyObject* pulsedThreadPy_p (PyObject *self, PyObject *args) {
 	unsigned int nPulses;
 	int accLevel;			// accuracy level, 0,1,2 as usual
 	if (!PyArg_ParseTuple(args,"Oiiii", &PyObjPtr, &lowTicks, &highTicks, &nPulses, &accLevel)) {
-		PyRun_SimpleString ("print (' error Parsing Input')");
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse input for Python object pointer, low ticks, high ticks, number of pulses, and timing method.");
 		return NULL;
 	}
 	// make the pulsed thread with PyObjPtr as the Init Data, no INIT function (just copy over the PyObjPtr to taskData), and pulsedThread_RunPythonLoFunc and pulsedThread_RunPythonLoFunc as functions to run
 	int errCode =0;
 	pulsedThread * threadObj = new pulsedThread ((unsigned int)lowTicks, (unsigned int) highTicks, (unsigned int) nPulses, (void *) PyObjPtr, nullptr, &pulsedThread_RunPythonLoFunc, &pulsedThread_RunPythonHiFunc, accLevel, errCode);
 	if (errCode){
-		PyRun_SimpleString ("print (' error making pulsedThread object')");
+		PyErr_SetString (PyExc_RuntimeError, "Could not make a new pulsedThread object.");
 		return NULL;
 	}
 	return PyCapsule_New (static_cast <void *>(threadObj), "pulsedThread", pulsedThread_del);
@@ -39,7 +37,7 @@ static PyObject* pulsedThreadPy_f (PyObject *self, PyObject *args) {
 	float trainDur;			//train duration in seconds
 	int accLevel;			// accuracy level, 0,1,2 as usual
 	if (!PyArg_ParseTuple(args,"Offfi", &PyObjPtr, &frequency, &dutyCycle, &trainDur, &accLevel)) {
-		PyRun_SimpleString ("print (' error parsing input')");
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse input for Python object pointer, frequency, duty cycle, train duration, and timing method.");
 		return NULL;
 	}
 	// make the pulsed thread with PyObjPtr as the Init Data, no INIT function (just copy over the PyObjPtr to taskCustomData), and pulsedThread_RunPythonLoFunc and pulsedThread_RunPythonLoFunc as functions to run
@@ -52,11 +50,13 @@ static PyObject* pulsedThreadPy_f (PyObject *self, PyObject *args) {
 	return PyCapsule_New (static_cast <void *>(threadObj), "pulsedThread", pulsedThread_del);
 }
 
-  /* Module method table - the first 22 methods are defined in pyPulsedThread.h*/
+  /* Module method table - the first 23 methods are defined in pyPulsedThread.h*/
 static PyMethodDef ptPyFuncsMethods[]= {	
 	{"isBusy", pulsedThread_isBusy, METH_O, "returns number of tasks a thread has left to do, 0 means finished all tasks"},
+	{"waitOnBusy", pulsedThread_waitOnBusy, METH_VARARGS, "Returns when a thread is no longer busy, or after timeOut secs"},
 	{"doTask", pulsedThread_doTask, METH_O, "Tells the pulsedThread object to do whatever task it was configured for"},
 	{"doTasks", pulsedThread_doTasks, METH_VARARGS, "Tells the pulsedThread object to do whatever task it was configured for multiple times"},
+	{"unDoTasks", pulsedThread_unDoTasks, METH_O, "Tells the pulsedThread object to stop doing however many task it was asked to do"},
 	{"startTrain", pulsedThread_startTrain, METH_O, "Tells a pulsedThread object configured as an infinite train to start"},
 	{"stopTrain", pulsedThread_stopTrain, METH_O, "Tells a pulsedThread object configured as an infinite train to stop"},
 	{"modDelay", pulsedThread_modDelay, METH_VARARGS, "changes the delay period of a pulse or LOW period of a train"},
@@ -73,9 +73,7 @@ static PyMethodDef ptPyFuncsMethods[]= {
 	{"getTrainDutyCycle", pulsedThread_getTrainDutyCycle, METH_O, "returns duty of a train, between 0 and 1"},
 	{"unsetEndFunc", pulsedThread_UnSetEndFunc, METH_O, "un-sets any end function set for this pulsed thread"},
 	{"hasEndFunc", pulsedThread_hasEndFunc, METH_O, "Returns the endFunc status (installed or not installed) for this pulsed thread"},
-	{"setTaskObject", pulsedThread_SetPythonTaskObj, METH_VARARGS, "sets a Python object whose LoFunc and HiFunc are called from the pulsedThread"},
-	{"setEndFuntionObject", pulsedThread_SetPythonEndFuncObj, METH_VARARGS, "sets a Python object whose endFunc is called from the pulsedThread, getting either pulse time or frequency information"},
-
+	
 	{"initByPulse", pulsedThreadPy_p, METH_VARARGS, "Returns a new pulsedThread object that calls your objects HiFunc and LoFunc methods"},
 	{"initByFreq", pulsedThreadPy_f, METH_VARARGS, "Returns a new pulsedThread object that calls your objects HiFunc and LoFunc methods"},
 	{ NULL, NULL, 0, NULL}

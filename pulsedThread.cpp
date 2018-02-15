@@ -420,14 +420,16 @@ void pulsedThread::DoTasks(unsigned int nTasks){
 	pthread_mutex_unlock( &theTask.taskMutex );
 }
 
-/************* countermands currently requested tasks ***************************************
+/* ************ countermands currently requested tasks ***************************************
  The thread will finish the current pulse or train of pulses then stop
  Last Modified:
+2018/02/14 by Jamie Boyd - made sure one task was set for thread to unset, else doTask might go negative
  2018/02/09 by Jamie Boyd - initial Version */
 void pulsedThread::UnDoTasks (void){
-    if (theTask.doTask &~kMODANY) {
+    if (theTask.doTask &~kMODANY) { // no need to so anything unless 1 or more tasks still left to do
         pthread_mutex_lock (&theTask.taskMutex);
-        theTask.doTask &= kMODANY;
+        theTask.doTask &= kMODANY; // unset all tasks
+	 theTask.doTask |= 1; // set one task; thread will unset it when it finishes the current task 
         pthread_cond_signal(&theTask.taskVar);
         pthread_mutex_unlock( &theTask.taskMutex);
     }

@@ -236,11 +236,11 @@ class pulsedThread{
 		pulsedThread (unsigned int, unsigned int, unsigned int, void *  , int (*)(void *, void *  &), void (*)(void *), void (*)(void *), int , int &);
 		pulsedThread  (float, float, float, void *, int (*)(void *, void * &), void (*)(void *), void (*)(void *), int , int &);
 		virtual ~pulsedThread();
-		/* ********************* Requesting a task and checking if we are doinga task ***********************************************************/
+		/* ********************* Requesting a task and checking if we are doing a task ***********************************************************/
 		void DoTask (void); // requests that the thread perform its task once, as currently configured, if not an infinite train, or will start an infinite train
 		void DoTasks (unsigned int nTasks); // requests that the thread perform its task nTasks times, as currently configured, or
-        void UnDoTasks (void); // zeros requested tasks in doTask. Thread stops after current task
-        int isBusy(); // checks if a task is busy, returns how many tasks are left to do
+		void UnDoTasks (void); // removes requested tasks in doTask, save 1. Thread stops after current task
+		int isBusy(); // checks if a task is busy, returns how many tasks are left to do
 		int waitOnBusy(float timeOut); // doesn't return until a thread is no longer busy
 		// for infinite trains
 		void startInfiniteTrain(void);  // starts an infinite train
@@ -281,8 +281,8 @@ class pulsedThread{
 		/* *******************************taskParams structure ***********************************************************************************/
 		struct taskParams theTask;  // thread, mutex, condition variable, and task variables are all in theTask 
 		/* ********************************* function pointers for destructor to run ******************************************************/
-		void (*delTaskDataFunc)( void *); // deletes custom Task Data used by Hifunc and LoFunc
-		void (*delEndFuncDataFunc) (void *); // deletes custom data used by endFunc
+		void (*delTaskDataFunc)( void *); // function deletes custom Task Data used by Hifunc and LoFunc
+		void (*delEndFuncDataFunc) (void *); // function that deletes custom data used by endFunc
 };
 
 #endif // PULSEDTHREAD_H

@@ -59,7 +59,11 @@ class PT_Greeter (object):
         return ptGreeter.waitOnBusy (self.task_ptr, delaySecs)  
  
 if __name__ == '__main__':
-    myGreeter =  PT_Greeter (PT_Greeter.ACC_MODE_SLEEPS, "C++ python interfacing")
+    try:
+        myGreeter =  PT_Greeter (PT_Greeter.ACC_MODE_SLEEPS, "C++ python interfacing")
+    except Exception as e:
+        print (e)
+        quit()
     print ("Default number of greetings = ", myGreeter.get_num_greets ())
     print ("Default hello time is ",  myGreeter.get_hello_time(), ' seconds')
     print ("Default goodbye time is ",  myGreeter.get_goodbye_time(), ' seconds')

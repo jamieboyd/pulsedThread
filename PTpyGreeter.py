@@ -16,13 +16,14 @@ The PT_Py_Greeter HiFunc and LoFunc simply print hellos and good byes.
 The __main__ function makes a PT_Py_Greeter and sets it going, then does some calculations in a loop,
 printing results as it goes, to show the independence of the threaded PT_Py_Greeter from the main code.
 The class field PSEUDO_MUTEX is used for preventing print statements from different places in the code
-from executing at the same time, which leads to garbled output. Unlike a real mutex, execution is
-not halted while waiting on the PSEUDO_MUTEX, hence the loops with calls to sleep to allow the other
-threads of execution to continue while waitng for the mutex to be free. Also, read/write to the
+from executing at the same time, which leads to garbled output. Unlike a real mutex, execution of the
+thread is not halted while waiting on the PSEUDO_MUTEX, hence the loops with calls to sleep to allow the
+other threads of execution to continue while waiting for the mutex to be free. Also, read/write to the
 PSEUDO_MUTEX is not atomic; one thread may read PSEUDO_MUTEX as 0, and set it to 1, but in the interval
-between reading and writing to PSEUDO_MUTEX,another thread may have read PSEUDO_MUTEX
-as 0 and both threads think they have the mutex.
+between reading and writing to PSEUDO_MUTEX,another thread may have read PSEUDO_MUTEX as 0 and both
+threads think they have the mutex.
 """
+import pulsedThread
 import ptPyFuncs
 from time import sleep as sleep
 from time import time as time
@@ -77,37 +78,37 @@ class PT_Py_Greeter (object):
         PT_Py_Greeter.PSEUDO_MUTEX = 0
         
     def TurnOnEndFunc (self, mode):
-        ptPyFuncs.setEndFuntionObject(self.task_ptr, self, mode)
+        pulsedThread.setEndFuntionObject(self.task_ptr, self, mode)
 
     def TurnOffEndFunc (self, mode):
-        ptPyFuncs.unsetEndFunc (self.task_ptr)
+        pulsedThread.unsetEndFunc (self.task_ptr)
         
     def greet(self):
-        ptPyFuncs.doTask(self.task_ptr)
+        pulsedThread.doTask(self.task_ptr)
 
     def greet_many (self, n_trains):
-        ptPyFuncs.doTasks(self.task_ptr, n_trains)
+        pulsedThread.doTasks(self.task_ptr, n_trains)
 
     def get_goodbye_time (self):
-        return ptPyFuncs.getPulseDelay(self.task_ptr)
+        return pulsedThread.getPulseDelay(self.task_ptr)
 
     def get_hello_time (self):
-        return ptPyFuncs.getPulseDuration (self.task_ptr)
+        return pulsedThread.getPulseDuration (self.task_ptr)
 
     def get_num_greets (self):
-        return ptPyFuncs.getPulseNumber (self.task_ptr)
+        return pulsedThread.getPulseNumber (self.task_ptr)
 
     def set_num_greets (self, numGreets):
-        ptPyFuncs.modTrainLength (self.task_ptr, numGreets)
+        pulsedThread.modTrainLength (self.task_ptr, numGreets)
 
     def set_goodbye_time (self, goodbyeSecs):
-        ptPyFuncs.modDelay (self.task_ptr, goodbyeSecs)
+       pulsedThread.modDelay (self.task_ptr, goodbyeSecs)
 
     def set_hello_time (self, helloSecs):
-        ptPyFuncs.modDur (self.task_ptr, helloSecs)
+        pulsedThread.modDur (self.task_ptr, helloSecs)
         
     def is_greeting (self):
-        return ptPyFuncs.isBusy (self.task_ptr)
+        return pulsedThread.isBusy (self.task_ptr)
     
     def wait_greeting (self, delaySecs):
         """There is no ptPyFuncs.waitOnBusy because of the Global interpreter Lock.
@@ -120,7 +121,6 @@ class PT_Py_Greeter (object):
 
 
 if __name__ == '__main__':
-    global pseudo_mutex
     pseudo_mutex =0
     pyGreeter = PT_Py_Greeter (PT_Py_Greeter.INIT_FREQ, 2, 0.5, 3, PT_Py_Greeter.ACC_MODE_SLEEPS, "Python functions run from C++")
     print ("hello time is ",  pyGreeter.get_hello_time(), 'seconds')

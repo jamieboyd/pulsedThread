@@ -32,6 +32,7 @@ static PyObject* pulsed_C_Greeter (PyObject *self, PyObject *args) {
 	int accLevel;
 	// parse the arguments and copy into local variables
 	if (!PyArg_ParseTuple(args,"is",  &accLevel, &localName)) {
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for timing mode and name string.");
 		return NULL;
 	}
 	// make a ptTestStruct to use for iniitialization, with name from Python 
@@ -46,6 +47,7 @@ static PyObject* pulsed_C_Greeter (PyObject *self, PyObject *args) {
 	int errCode =0;
 	pulsedThread * threadObj = new pulsedThread ((unsigned int)50000, (unsigned int)50000, (unsigned int)10, (void *) &initStruct, &ptTest_Init, &ptTest_Lo, &ptTest_Hi, accLevel, errCode);
 	if (errCode){
+		PyErr_SetString (PyExc_RuntimeError, "Could not make a new pulsedThread object.");
 		return NULL;
 	}else{
 		return PyCapsule_New (static_cast <void *>(threadObj), "pulsedThread", pulsedThread_del);
@@ -61,6 +63,7 @@ static PyMethodDef ptGreeterMethods[] = {
 	{"waitOnBusy", pulsedThread_waitOnBusy, METH_VARARGS, "Returns when a thread is no longer busy, or after timeOut secs"},
 	{"doTask", pulsedThread_doTask, METH_O, "Tells the pulsedThread object to do whatever task it was configured for"},
 	{"doTasks", pulsedThread_doTasks, METH_VARARGS, "Tells the pulsedThread object to do whatever task it was configured for multiple times"},
+	{"unDoTasks", pulsedThread_unDoTasks, METH_O, "Tells the pulsedThread object to stop doing however many task it was asked to do"},
 	{"startTrain", pulsedThread_startTrain, METH_O, "Tells a pulsedThread object configured as an infinite train to start"},
 	{"stopTrain", pulsedThread_stopTrain, METH_O, "Tells a pulsedThread object configured as an infinite train to stop"},
 	{"modDelay", pulsedThread_modDelay, METH_VARARGS, "changes the delay period of a pulse or LOW period of a train"},

@@ -29,6 +29,7 @@ static PyObject* pulsedThread_waitOnBusy (PyObject *self, PyObject *args) {
 	PyObject *PyPtr;
 	float timeOutSecs;
 	if (!PyArg_ParseTuple(args,"Of", &PyPtr, &timeOutSecs)) {
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and timeOut seconds.");
 		return NULL;
 	}
 	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -42,11 +43,12 @@ static PyObject* pulsedThread_doTask (PyObject *self, PyObject *PyPtr) {
     Py_RETURN_NONE;
 }
 
-  /*pulsedThread_doTasks tells the pulsedThread object to perform whatever task it was configured to do multiple times*/
+/*pulsedThread_doTasks tells the pulsedThread object to perform whatever task it was configured to do multiple times*/
 static PyObject* pulsedThread_doTasks (PyObject *self, PyObject *args) {
 	PyObject *PyPtr;
 	int nTimes;
 	if (!PyArg_ParseTuple(args,"Oi", &PyPtr, &nTimes)) {
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and number of times to do task");
 		return NULL;
 	}
 	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -54,6 +56,12 @@ static PyObject* pulsedThread_doTasks (PyObject *self, PyObject *args) {
 	Py_RETURN_NONE;
 }
 
+/*pulsedThread_doTask tells the pulsedThread object to stop perform whatever tasks it was asked to do */
+static PyObject* pulsedThread_unDoTasks (PyObject *self, PyObject *PyPtr) {
+    pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
+    threadPtr->UnDoTasks();
+    Py_RETURN_NONE;
+}
 
   /*pulsedThread_startTrain tells  pulsedThread object configured as an infinite train to start ticking*/
 static PyObject* pulsedThread_startTrain (PyObject *self, PyObject *PyPtr) {
@@ -75,6 +83,7 @@ static PyObject*  pulsedThread_modDelay (PyObject *self, PyObject *args) {
     PyObject *PyPtr;
     float newDelay;
     if (!PyArg_ParseTuple(args,"Of", &PyPtr, &newDelay)) {
+	    PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and pulse delay seconds.");
         return NULL;
     }
     pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -86,6 +95,7 @@ static PyObject*  pulsedThread_modDur (PyObject *self, PyObject *args) {
     PyObject *PyPtr;
     float newDur;
     if (!PyArg_ParseTuple(args,"Of", &PyPtr, &newDur)) {
+	PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and pulse duration seconds.");
         return NULL;
     }
     pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -98,6 +108,7 @@ static PyObject*  pulsedThread_modTrainLength(PyObject *self, PyObject *args) {
     PyObject *PyPtr;
     unsigned int newTrainLength;
     if (!PyArg_ParseTuple(args,"OI", &PyPtr, &newTrainLength)) {
+	PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and number of pulses in train");
         return NULL;
     }
     pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -112,6 +123,7 @@ static PyObject*  pulsedThread_modTrainDur (PyObject *self, PyObject *args) {
     PyObject *PyPtr;
     float newDur;
     if (!PyArg_ParseTuple(args,"Of", &PyPtr, &newDur)) {
+	PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and train duration.");
         return NULL;
     }
     pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -123,6 +135,7 @@ static PyObject*  pulsedThread_modFreq(PyObject *self, PyObject *args) {
     PyObject *PyPtr;
     float newFreq;
     if (!PyArg_ParseTuple(args,"Of", &PyPtr, &newFreq)) {
+	PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and train frequency.");
         return NULL;
     }
     pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -134,6 +147,7 @@ static PyObject*  pulsedThread_modDutyCycle (PyObject *self, PyObject *args) {
     PyObject *PyPtr;
     float newDutyCycle;
     if (!PyArg_ParseTuple(args,"Of", &PyPtr, &newDutyCycle)) {
+	PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and train duty cycle.");
         return NULL;
     }
     pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -241,7 +255,7 @@ static PyObject* pulsedThread_SetPythonEndFuncObj (PyObject *self, PyObject *arg
 	PyObject *PyObjPtr;		// second argument is a Python object that better have an endFunc 
 	int endFuncPulseDesc;	// 0 for calling endFunc with frequency,duration,train length info, non-zero for microseond pulse delay, duration, and pulse number description
 	if (!PyArg_ParseTuple(args,"OOi", &PyPtr, &PyObjPtr, &endFuncPulseDesc)) {
-		PyRun_SimpleString ("print (' error')");
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer, Python Object providing endFunction, and pulse description code.");
 		return NULL;
 	}
 	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -272,7 +286,7 @@ static PyObject* pulsedThread_SetPythonTaskObj (PyObject *self, PyObject *args) 
 	PyObject *PyPtr;		// first argument is the Python pyCapsule that points to the pulsedThread
 	PyObject *PyObjPtr;		// second argument is a Python object that better have HI and LO Functions
 	if (!PyArg_ParseTuple(args,"OO", &PyPtr, &PyObjPtr)) {
-		PyRun_SimpleString ("print (' error')");
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and Python Object providing the HI and LO functions.");
 		return NULL;
 	}
 	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -287,5 +301,4 @@ static PyObject* pulsedThread_SetPythonTaskObj (PyObject *self, PyObject *args) 
 	}
 	Py_RETURN_NONE;
 }
-
 #endif

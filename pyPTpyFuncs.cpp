@@ -76,7 +76,7 @@ static PyMethodDef ptPyFuncsMethods[]= {
 	{"setEndFuncObj", pulsedThread_SetPythonEndFuncObj, METH_VARARGS, "(PyCapsule, PythonObj) sets a Python object to provide endFunction for pulsedThread"},
 	{"setTaskFuncObj", pulsedThread_SetPythonTaskObj, METH_VARARGS, "(PyCapsule, PythonObj) sets a Python object to provide LoFunc and HiFunc for pulsedThread"},
 	{"setArrayEndFunc", pulsedThread_setArrayFunc, METH_VARARGS, "(PyCapsule, Python float array, endFuncType, isLocking) sets pulsedThread endFunc to set frequency (type 0) or duty cycle (type 1) from a Python float array"},
-	{"cosDutyCycleArray", pulsedThread_cosineDutyCycleArray, METH_VARARGS, "(PyCapsule, Python float array, pointsPerCycle, offset, scaling) fills passed-in array with cosine values of given period, with applied scaling and offset expected to range between 0 and 1"},
+	{"cosDutyCycleArray", pulsedThread_cosineDutyCycleArray, METH_VARARGS, "(Python float array, pointsPerCycle, offset, scaling) fills passed-in array with cosine values of given period, with applied scaling and offset expected to range between 0 and 1"},
 	
 	{"initByPulse", pulsedThreadPy_p, METH_VARARGS, "Returns a new pulsedThread object that calls your objects HiFunc and LoFunc methods"},
 	{"initByFreq", pulsedThreadPy_f, METH_VARARGS, "Returns a new pulsedThread object that calls your objects HiFunc and LoFunc methods"},

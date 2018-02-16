@@ -235,12 +235,12 @@ class pulsedThread{
 		accLevel is 1 to keep a timer going to track elapsed time, and to cycle on current time for short intervals. processor intensive, but more accurate  */
 		pulsedThread (unsigned int, unsigned int, unsigned int, void *  , int (*)(void *, void *  &), void (*)(void *), void (*)(void *), int , int &);
 		pulsedThread  (float, float, float, void *, int (*)(void *, void * &), void (*)(void *), void (*)(void *), int , int &);
-		virtual ~pulsedThread();
+		virtual ~pulsedThread(void);
 		/* ********************* Requesting a task and checking if we are doing a task ***********************************************************/
 		void DoTask (void); // requests that the thread perform its task once, as currently configured, if not an infinite train, or will start an infinite train
 		void DoTasks (unsigned int nTasks); // requests that the thread perform its task nTasks times, as currently configured, or
 		void UnDoTasks (void); // removes requested tasks in doTask, save 1. Thread stops after current task
-		int isBusy(); // checks if a task is busy, returns how many tasks are left to do
+		int isBusy(void); // checks if a task is busy, returns how many tasks are left to do
 		int waitOnBusy(float timeOut); // doesn't return until a thread is no longer busy
 		// for infinite trains
 		void startInfiniteTrain(void);  // starts an infinite train

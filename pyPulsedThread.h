@@ -204,9 +204,8 @@ static PyObject* pulsedThread_UnSetEndFunc (PyObject *self, PyObject *PyPtr) {
 }
 
 
-/* *************************************** Support for Python Objects providing Hi, Lo, and endFuncs ********************************* /
-
-/* Runs PyObject.HiFunc()  taskData is assumed to be a pointer to a python object that has methods called HiFunc and loFunc that take no arguments */
+/* *************************************** Support for Python Objects providing Hi, Lo, and endFuncs ********************************
+Runs PyObject.HiFunc()  taskData is assumed to be a pointer to a python object that has methods called HiFunc and loFunc that take no arguments */
 static void pulsedThread_RunPythonHiFunc (void * taskData){
 	PyObject *PyObjPtr = (PyObject *) taskData;
 	PyGILState_STATE state=PyGILState_Ensure();
@@ -330,7 +329,7 @@ static PyObject* pulsedThread_setArrayFunc (PyObject *self, PyObject *args) {
 	
 	float* arrayStart = static_cast <float *>(buffer.buf); // Now we have a pointer to the array from the passed in buffer
 	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread")); // get pointer to pulsedThread
-	errVar = threadPtr->setUpEndFuncArray (arrayStart, (unsigned int) buffer.len/buffer.itemsize, isLocking);	
+	int errVar = threadPtr->setUpEndFuncArray (arrayStart, (unsigned int) buffer.len/buffer.itemsize, isLocking);	
 	//int errVar = SimpleGPIO_setUpArray (threadPtr, arrayStart, (unsigned int) buffer.len/buffer.itemsize, isLocking); // adds a pointer to the array to the endFunc data
 	if (errVar){
 		PyErr_SetString (PyExc_RuntimeError, "Failed to set up the array for the endFunction");
@@ -371,7 +370,7 @@ static PyObject* pulsedThread_cosineDutyCycleArray (PyObject *self, PyObject *ar
 		return NULL;
 	}
 	float* arrayData = static_cast <float *>(buffer.buf); // Now we have a pointer to the array from the passed in buffer	
-	int errVar = cosineDutyCycleArray  (arrayData, (unsigned int) buffer.len/buffer.itemsize, period,  offset,  scaling);
+	int errVar = pulsedThread::cosineDutyCycleArray  (arrayData, (unsigned int) buffer.len/buffer.itemsize, period,  offset,  scaling);
 	if (errVar){
 		PyErr_SetString (PyExc_RuntimeError, "Adjust offset and scaling so cosine is bounded by 0 and 1");
 		return NULL;

@@ -662,7 +662,7 @@ int pulsedThread::hasEndFunc  (void){
 	}
 }
 
-int cosineDutyCycleArray  (float * arrayData, unsigned int arraySize, unsigned int period, float offset, float scaling){
+int pulsedThread::cosineDutyCycleArray  (float * arrayData, unsigned int arraySize, unsigned int period, float offset, float scaling){
 	const double phi = 6.2831853071794;
 	if (((offset - scaling ) < 0) || ((offset + scaling) > 1)){
 #if beVerbose

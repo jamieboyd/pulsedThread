@@ -253,13 +253,14 @@ static PyObject* pulsedThread_SetPythonEndFuncObj (PyObject *self, PyObject *arg
 	PyObject *PyPtr;		// first argument is the Python pyCapsule that points to the pulsedThread
 	PyObject *PyObjPtr;		// second argument is a Python object that better have an endFunc 
 	int endFuncPulseDesc;	// 0 for calling endFunc with frequency,duration,train length info, non-zero for microseond pulse delay, duration, and pulse number description
-	if (!PyArg_ParseTuple(args,"OOi", &PyPtr, &PyObjPtr, &endFuncPulseDesc)) {
-		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer, Python Object providing endFunction, and pulse description code.");
+	int isLocking;
+	if (!PyArg_ParseTuple(args,"OOii", &PyPtr, &PyObjPtr, &endFuncPulseDesc, &isLocking)) {
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer, Python Object providing endFunction, pulse description code, and isLocking.");
 		return NULL;
 	}
 	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
 	// set the endFunc data to the object
-	threadPtr->modCustom (&pulsedThread_modEndFuncObj, (void *) PyObjPtr, 0);
+	threadPtr->modCustom (&pulsedThread_modEndFuncObj, (void *) PyObjPtr, isLocking);
 	
 	if (endFuncPulseDesc == 0){
 		threadPtr->setEndFunc (&pulsedThread_RunPythonEndFunc_f);
@@ -284,8 +285,9 @@ int pulsedThread_modTaskObj (void * pyObjPtr, taskParams * taskDataP){
 static PyObject* pulsedThread_SetPythonTaskObj (PyObject *self, PyObject *args) {
 	PyObject *PyPtr;		// first argument is the Python pyCapsule that points to the pulsedThread
 	PyObject *PyObjPtr;		// second argument is a Python object that better have HI and LO Functions
-	if (!PyArg_ParseTuple(args,"OO", &PyPtr, &PyObjPtr)) {
-		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer and Python Object providing the HI and LO functions.");
+	int isLocking;
+	if (!PyArg_ParseTuple(args,"OOi", &PyPtr, &PyObjPtr, &isLocking)) {
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer, Python Object providing the HI and LO functions, and isLocking.");
 		return NULL;
 	}
 	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
@@ -293,7 +295,7 @@ static PyObject* pulsedThread_SetPythonTaskObj (PyObject *self, PyObject *args) 
 	threadPtr->setLowFunc (&pulsedThread_RunPythonLoFunc); // sets the function that is called on low part of cycle
 	threadPtr->setHighFunc (&pulsedThread_RunPythonLoFunc); // sets the function that is called on high part of cycle
 	// set the task data to the object
-	threadPtr->modCustom (&pulsedThread_modTaskObj, (void *) PyObjPtr, 0);
+	threadPtr->modCustom (&pulsedThread_modTaskObj, (void *) PyObjPtr, isLocking);
 	// Activate Python Thread Awareness
 	if (!PyEval_ThreadsInitialized()){
 		PyEval_InitThreads();
@@ -309,7 +311,7 @@ static PyObject* pulsedThread_setArrayFunc (PyObject *self, PyObject *args) {
 	int isLocking; 
 	
 	if (!PyArg_ParseTuple(args,"OOii", &PyPtr, &bufferObj, &endFuncType, &isLocking)) {
-		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer, floating point buffer, and endFunction type code.");
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for pulsedThread pointer, floating point buffer,  endFunction type code, and isLocking.");
 		return NULL;
 	}
 	if (PyObject_CheckBuffer (bufferObj) == 0){

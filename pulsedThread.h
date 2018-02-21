@@ -263,7 +263,7 @@ class pulsedThread{
 		int modCustom (int (*modFunc)(void *, taskParams *), void * modData, int isLocking); // for either taskData or endFunc data
 		int getModCustomStatus (void); // returns 1 if waiting for the pthread to do a requested modification for either taskData or endFunc data
 		static int cosineDutyCycleArray  (float * arrayData, unsigned int arraySize, unsigned int period, float offset, float scaling); //Utility function to fill a passed in array with a cosine wave useful for pulsedThreadDutyCycleFromArrayEndFunc 
-		int setUpEndFuncArray (float * newData, unsigned int nData, int isLocking);
+		int setUpEndFuncArray (float * newData, unsigned int nData, int isLocking); // sets up endFunc data to cycle through an array of floats
 		void getTaskMutex (void);
 		void giveUpTaskMutex (void);
 		void * getTaskData (void); // returns a pointer to the custom data for the task

@@ -90,6 +90,15 @@ typedef struct pulsedThreadArrayStruct{
 	unsigned int arrayPos;	// current position in array, as it is iterated through
 }pulsedThreadArrayStruct, *pulsedThreadArrayStructPtr;
 
+/* **************custom struct for a modFunction endFunc Data using an array*****************************
+Used to modify which section of the array to currently use, or set current position in the array */
+typedef struct pulsedThreadArrayModStruct{
+	int modBits;			// bit-wise for which param to modify, 1 sor startPos, 2 for endPos, 4 for arrayPos
+	unsigned int startPos; // where to start in the array when out putting data
+	unsigned int endPos;		// where to end in the array
+	unsigned int arrayPos;	// current position in array, as it is iterated through
+}pulsedThreadArrayModStruct, *pulsedThreadArrayModStructPtr;
+
 
 /* *************************** Function Declarations for non-class Functions used by pthread **********************************/
 int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask);
@@ -262,8 +271,6 @@ class pulsedThread{
 		/* ********** Modifying custom data (taskData or endFunc data) with provided modifier data and modifier function ***************/
 		int modCustom (int (*modFunc)(void *, taskParams *), void * modData, int isLocking); // for either taskData or endFunc data
 		int getModCustomStatus (void); // returns 1 if waiting for the pthread to do a requested modification for either taskData or endFunc data
-		static int cosineDutyCycleArray  (float * arrayData, unsigned int arraySize, unsigned int period, float offset, float scaling); //Utility function to fill a passed in array with a cosine wave useful for pulsedThreadDutyCycleFromArrayEndFunc 
-		int setUpEndFuncArray (float * newData, unsigned int nData, int isLocking); // sets up endFunc data to cycle through an array of floats
 		void getTaskMutex (void);
 		void giveUpTaskMutex (void);
 		void * getTaskData (void); // returns a pointer to the custom data for the task
@@ -277,6 +284,13 @@ class pulsedThread{
 		void unSetEndFunc (void); //removes end func, replaces with nullptr
 		int hasEndFunc  (void); // returns 1 if an endFunc is installed, else 0
 		void setEndFuncDataDelFunc  (void (*delFunc)( void *)); // sets a function that will be run when a pulsedThread is about to be killed
+		/* ************************ Special functions for using an endFunction that cycles through an array of frequencies or duty cycles **************** */
+		void chooseArrayEndFunc (int endFuncMode); // endFuncMode is 0 for frequency from array, 1 for dutyCycle from array
+		int setUpEndFuncArray (float * newData, unsigned int nData, int isLocking); // sets up endFunc data to cycle through an array of floats
+		int setEndFuncArrayLimits (unsigned int startPosP, unsigned int endPosP, int isLocking); // sets start and end within array
+		int setEndFuncArrayPos (unsigned int arrayPosP, int isLocking); // sets current position within the array
+		static int cosineDutyCycleArray  (float * arrayData, unsigned int arraySize, unsigned int period, float offset, float scaling); //Utility function to fill a passed-in array with a cosine
+		
 	protected:
 		/* *******************************taskParams structure ***********************************************************************************/
 		struct taskParams theTask;  // thread, mutex, condition variable, and task variables are all in theTask 

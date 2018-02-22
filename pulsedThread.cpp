@@ -623,11 +623,26 @@ void pulsedThread::setEndFunc (void (*endFunc)(taskParams *)){
 	theTask.endFunc = endFunc;
 }
 
-/* ************************** Setting up End Functions for selecting train frequency/duty from an array ******************
+/* ************************** Setting up modifying End Functions for selecting train frequency/duty from an array ******************
+
+
+/* ***********************************************************************
+Sets Endfunction that runs at end of each pulse, or train of pulses 
+last modified 2016/12/13 by Jamie Boyd  - initial version */
+void pulsedThread::chooseArrayEndFunc (int endFuncMode){
+	if (endFuncMode == 0){
+		theTask.endFunc = &pulsedThreadFreqFromArrayEndFunc;
+	}else {
+		if (endFuncMode == 1){
+			theTask.endFunc = &pulsedThreadDutyCycleFromArrayEndFunc;
+		}
+	}
+}
+
+/* ********************************************************Set Up ******************************************************
 sets up/change the array for pulsedThread using the pulsedThreadsetArrayCallback function.
 last modified:
-2018/02/02 by Jamie Boyd - initial version 
-**************************************************/
+2018/02/02 by Jamie Boyd - initial version */
 int pulsedThread::setUpEndFuncArray (float * newData, unsigned int nData, int isLocking){
 	// fill an array struct from passed-in data
 	pulsedThreadArrayStructPtr setUpStruct = new pulsedThreadArrayStruct;
@@ -642,6 +657,43 @@ int pulsedThread::setUpEndFuncArray (float * newData, unsigned int nData, int is
 	}
 	return errVar;	
 }
+
+
+/* *************************************** Set Array Position ************************************
+Changes the position the endFunc is currently outputting. Will start iterating from here
+Last Modified:
+2018/02/21 by Jamie boyd - initial version */
+int  pulsedThread::setEndFuncArrayPos (unsigned int arrayPosP, int isLocking){
+	// sanity check that endFunc is one of the array endFunctions
+	if ((theTask.endFunc == &pulsedThreadFreqFromArrayEndFunc) || (theTask.endFunc == &pulsedThreadDutyCycleFromArrayEndFunc)){
+		// make an array mod struct
+		pulsedThreadArrayModStructPtr modStruct = new pulsedThreadArrayModStruct;
+		modStruct ->modBits = 4;
+		modStruct->arrayPos =arrayPosP;
+		return modCustom (&pulsedThreadSetArrayLimitsCallback, (void *) modStruct, isLocking);
+	}else{
+		return 1;
+	}
+}
+
+/* *************************************** Set Array Limits ************************************
+Changes the start and enposition through which the endFunc will  iterate
+Last Modified:
+2018/02/21 by Jamie boyd - initial version */
+int  pulsedThread::setEndFuncArrayLimits (unsigned int startPosP, unsigned int endPosP, int isLocking){
+	// sanity check that endFunc is one of the array endFunctions
+	if ((theTask.endFunc == &pulsedThreadFreqFromArrayEndFunc) || (theTask.endFunc == &pulsedThreadDutyCycleFromArrayEndFunc)){
+		// make an array mod struct
+		pulsedThreadArrayModStructPtr modStruct = new pulsedThreadArrayModStruct;
+		modStruct ->modBits = 3;
+		modStruct-> startPos = startPosP;
+		modStruct -> endPos = endPosP;
+		return modCustom (&pulsedThreadSetArrayLimitsCallback, (void *) modStruct, isLocking);
+	}else{
+		etutn 1:
+	}
+}
+
 
 /* ***********************************************************************
 removes the function that runs at end of each pulse, or train of pulses
@@ -662,6 +714,12 @@ int pulsedThread::hasEndFunc  (void){
 	}
 }
 
+/* ***************************** utility function to fill a passed-in array with a cosine function**********************************
+Useful when setting duty cycle from an endfunc. Computed values must be between 0 and 1. offset = 0.5 and scaling = 0.5 will
+fill the full range from 0 to 1. period sets the repeat period for the cosine in points. If points = array size, you get 1 period
+of the cosine function. There is no parameter for phase, yet.  May add other standard waveforms like sawtooths and ramps
+last Modified:
+2018/02/21 by Jamie Boyd */
 int pulsedThread::cosineDutyCycleArray  (float * arrayData, unsigned int arraySize, unsigned int period, float offset, float scaling){
 	const double phi = 6.2831853071794;
 	if (((offset - scaling ) < 0) || ((offset + scaling) > 1)){
@@ -698,7 +756,7 @@ int pulsedThread::modCustom (int (*modFunc)(void *, taskParams * ), void * modDa
 }
 
 /* ****************** Mutex access if you want to change taskData directly ******************************
-you need to have a pointer to the taskData, or endFunc data, if you want to so this
+you need to have kept a pointer to the taskData, or endFunc data, if you want to so this
 
  *****************Gets the Mutex ****************************************
 Last Modified:
@@ -836,6 +894,35 @@ int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask){
 	endFuncDataPtr -> arrayPos = modDataP->arrayPos; // position in the array to output
 	// delete modData
 	delete ((pulsedThreadArrayStructPtr)modData);
+	return 0;
+} 
+
+/* ***************** Array position modification Callback **************************************************
+Sets starting, ending, and/or currrent position within array, scrunching current position to new array subset
+does NOT check if endArray position is actually within bounds of the array 
+Last modified:
+2018/02/21 by jamie Boys - initial version */
+int pulsedThreadSetArrayLimitsCallback (void * modData, taskParams * theTask){
+	// cast modData to a pulsedThreadArrayStructPtr
+	pulsedThreadArrayModStructPtr modDataPtr = (pulsedThreadArrayModStructPtr)modData;
+	// cast endFuncDataPtr to pulsedThreadArrayStructPtr
+	pulsedThreadArrayStructPtr endFuncDataPtr = (pulsedThreadArrayStructPtr)theTask->endFuncData ;
+	// copy over the data from modData
+	if ((modDataPtr->modBits) & 1){
+		endFuncDataPtr -> startPos = modDataPtr->startPos; // starting position in the array
+	}
+	if ((modDataPtr->modBits) & 2){
+		endFuncDataPtr -> endPos = modDataPtr->endPos; //  ending position in the array
+	}
+	if ((modDataPtr->modBits) & 4){
+		endFuncDataPtr -> arrayPos = modDataPtr->arrayPos; //  current position in the array
+	}
+	// scrunch arrayPos to start,end
+	if ((endFuncDataPtr -> arrayPos < endFuncDataPtr -> startPos) || (endFuncDataPtr -> arrayPos) > endFuncDataPtr -> endPos)){
+		endFuncDataPtr -> arrayPos = endFuncDataPtr -> startPos;
+	}
+	// delete modData
+	delete ((pulsedThreadArrayModStructPtr)modData);
 	return 0;
 } 
 

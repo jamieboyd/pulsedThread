@@ -9,9 +9,9 @@
 #include <cstdint>
 
 /* *********************Class to make and signal a task that does one of:************************************************
-    1) a single timed  pulse, recallable, for solenoids, e.g.
-    2) train of pulses as for buzzers or LEDS, recallable
-    3) infinite train with start/stop
+	1) a single timed  pulse, recallable, for solenoids, e.g.
+	2) train of pulses as for buzzers or LEDS, recallable
+	3) infinite train with start/stop
   
 Mixes C-style functions and structures with C++ to use pthreads with convenience of classes
 
@@ -102,6 +102,7 @@ typedef struct pulsedThreadArrayModStruct{
 
 /* *************************** Function Declarations for non-class Functions used by pthread **********************************/
 int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask);
+int pulsedThreadSetArrayLimitsCallback (void * modData, taskParams * theTask);
 void pulsedThreadFreqFromArrayEndFunc (taskParams * theTask);
 void pulsedThreadDutyCycleFromArrayEndFunc (taskParams * theTask);
 void pulsedThreadArrayStructCustomDel(void * taskData);
@@ -113,24 +114,21 @@ void pulsedThreadArrayStructCustomDel(void * taskData);
  ******************* Configure timespecs and timevals for thread timing and to do the waiting for acc levels 1 and 2 **************
 All we do is sleep for entire duration */
 inline void configureSleeper (unsigned int microSeconds, struct timespec *Sleeper){
-	unsigned long int timeNM; 
-	timeNM = microSeconds;
-	for (Sleeper->tv_sec =0; timeNM >= 1e06; timeNM -= 1e06, Sleeper->tv_sec +=1);
-	Sleeper->tv_nsec = timeNM  * 1e03; // microsecs to nano secs, timespec uses nanseconds, timevals use microseconds
+	Sleeper->tv_sec = microSeconds/1e06;
+	Sleeper->tv_nsec = (microSeconds - (Sleeper->tv_sec * 1e06))* 1e03; 
+	 // (microseconds - (Sleeper->tv_sec * 1e06)) would be equivalent to  (microSeconds % (unsigned int) 1e06)  - might be faster? processor dependant?
 }
 
 /* ************************************************** used for accLevel 1 **********************************************************
 We sleep for time period - kSLEEPTURNAROUND, then wake up and spin until timed period end returns false if period is too short for sleeping, else true */
 inline bool configureTurnaroundSleeper (unsigned int microSeconds, struct timespec *Sleeper){
-    if (microSeconds < kSLEEPTURNAROUND){
-        return false;
-    }else{
-        unsigned long int timeNM; // use long int to avoid overflow
-        timeNM = (microSeconds - kSLEEPTURNAROUND) ;
-        for (Sleeper->tv_sec =0; timeNM >= 1e06; timeNM -= 1e06, Sleeper->tv_sec +=1);
-        Sleeper->tv_nsec = timeNM * 1e03;// microsecs to nano secs
-        return true;
-    }
+	if (microSeconds < kSLEEPTURNAROUND){
+		return false;
+	}else{
+	Sleeper->tv_sec = microSeconds/1e06;
+	Sleeper->tv_nsec =(microSeconds - (Sleeper->tv_sec * 1e06))* 1e03;
+		return true;
+	}
 }
 
 /* ************************************** Sleeps for calculated time,then wakes and spins **************************/
@@ -145,21 +143,19 @@ inline void WAITINLINE1 (bool itSleeps, struct timespec *sleeper, struct timeval
 /* ********************************************** used for accuracy levels 1 and 2 ***************************************
 Configure Timers to hold periods for delay and duration, which are  added to spinEndTime for each period */
 inline void configureTimer (unsigned int microSeconds, struct timeval *Timer){
-    unsigned long int timeNM; // use long int to avoid overflow
-    timeNM = microSeconds; // timeval uses microsecs
-    for (Timer->tv_sec =0; timeNM >= 1e06; timeNM -= 1e06, Timer->tv_sec +=1);
-    Timer->tv_usec = timeNM;
+	Timer->tv_sec = microSeconds/1e06;
+	Timer->tv_usec = (microSeconds - (Timer->tv_sec * 1e06));
 }
 
 
 /* ******************************************** used for accuracy level 2 *******************************************************
 Sleep stuff is configured on the fly, but we can calculate in advance if sleep is entirely ruled out */
 inline bool  configureTurnaround (unsigned int microSeconds){
-    if (microSeconds < kSLEEPTURNAROUND){
-        return false;
-    }else{
-        return true;
-    }
+	if (microSeconds < kSLEEPTURNAROUND){
+		return false;
+	}else{
+		return true;
+	}
 }
  
 /* **********************************************calculates sleep times for each pulse ******************************************/

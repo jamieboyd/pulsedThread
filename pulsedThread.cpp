@@ -625,8 +625,6 @@ void pulsedThread::setEndFunc (void (*endFunc)(taskParams *)){
 
 /* ************************** Setting up modifying End Functions for selecting train frequency/duty from an array ******************
 
-
-/* ***********************************************************************
 Sets Endfunction that runs at end of each pulse, or train of pulses 
 last modified 2016/12/13 by Jamie Boyd  - initial version */
 void pulsedThread::chooseArrayEndFunc (int endFuncMode){
@@ -674,6 +672,7 @@ int  pulsedThread::setEndFuncArrayPos (unsigned int arrayPosP, int isLocking){
 	}else{
 		return 1;
 	}
+	return 0;
 }
 
 /* *************************************** Set Array Limits ************************************
@@ -690,8 +689,9 @@ int  pulsedThread::setEndFuncArrayLimits (unsigned int startPosP, unsigned int e
 		modStruct -> endPos = endPosP;
 		return modCustom (&pulsedThreadSetArrayLimitsCallback, (void *) modStruct, isLocking);
 	}else{
-		etutn 1:
+		return 1;
 	}
+	return 0;
 }
 
 
@@ -918,7 +918,7 @@ int pulsedThreadSetArrayLimitsCallback (void * modData, taskParams * theTask){
 		endFuncDataPtr -> arrayPos = modDataPtr->arrayPos; //  current position in the array
 	}
 	// scrunch arrayPos to start,end
-	if ((endFuncDataPtr -> arrayPos < endFuncDataPtr -> startPos) || (endFuncDataPtr -> arrayPos) > endFuncDataPtr -> endPos)){
+	if ((endFuncDataPtr -> arrayPos < endFuncDataPtr -> startPos) || (endFuncDataPtr -> arrayPos > endFuncDataPtr -> endPos)){
 		endFuncDataPtr -> arrayPos = endFuncDataPtr -> startPos;
 	}
 	// delete modData

@@ -463,7 +463,7 @@ int pulsedThread::waitOnBusy(float waitSecs){
 			return 0;
 		}
 	}
-	return 1;
+	return taskNum;
 }
 
 /* ***************************************************************************************************

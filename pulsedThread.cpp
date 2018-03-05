@@ -453,14 +453,14 @@ int pulsedThread::waitOnBusy(float waitSecs){
 	struct timespec delaySleeper;
 	configureSleeper (1.01 * kSLEEPTURNAROUND, &delaySleeper);
 	unsigned int nWait = (waitSecs * 1e06)/(1.01 * kSLEEPTURNAROUND);
-	int taskNum ;
+	int taskNum =0 ;
 	for (unsigned int ii =0; ii < nWait ; ii+=1){
 		nanosleep (&delaySleeper, NULL);
 		pthread_mutex_lock (&theTask.taskMutex);
 		taskNum = theTask.doTask;
 		pthread_mutex_unlock( &theTask.taskMutex);
 		if (taskNum == 0){
-			return 0;
+			break;
 		}
 	}
 	return taskNum;

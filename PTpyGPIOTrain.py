@@ -51,7 +51,7 @@ class PT_Py_GPIO_train (object):
         self.period = p_period
         self.iArray = 0
         #ptPyFuncs.setArrayEndFunc(self.task_ptr, self.periodArray, 0, 0)
-        ptPyFuncs.setEndFuncObj(self.task_ptr, self, 1)
+        ptPyFuncs.setEndFuncObj(self.task_ptr, self, 1, 1)
 
     def TurnOffEndFunc (self, mode):
         ptPyFuncs.unsetEndFunc (self.task_ptr)

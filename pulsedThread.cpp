@@ -225,15 +225,17 @@ extern "C" void* pulsedThreadFunc (void * tData){
 			printf ("A train was called with doTask = %d and nPulses = %d.\n", theTask->doTask, theTask->nPulses);
 #endif
 			for (unsigned int iTick=0; iTick < theTask->nPulses; iTick++){
-				theTask->hiFunc(theTask->taskData);
-				if (theTask ->accLevel == ACC_MODE_SLEEPS){
-					nanosleep (&durSleeper, NULL);
-				}else{
-					timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
-					if  (theTask ->accLevel ==ACC_MODE_SLEEPS_AND_SPINS){
-						WAITINLINE1 (durSleeps, &durSleeper, &spinEndTime);
+				if (theTask->pulseDurUsecs > 0) {
+					theTask->hiFunc(theTask->taskData);
+					if (theTask ->accLevel == ACC_MODE_SLEEPS){
+						nanosleep (&durSleeper, NULL);
 					}else{
-						WAITINLINE2 (durSleeps, &turnaroundTime, &spinEndTime);
+						timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
+						if  (theTask ->accLevel ==ACC_MODE_SLEEPS_AND_SPINS){
+							WAITINLINE1 (durSleeps, &durSleeper, &spinEndTime);
+						}else{
+							WAITINLINE2 (durSleeps, &turnaroundTime, &spinEndTime);
+						}
 					}
 				}
 				if (theTask->pulseDelayUsecs > 0){

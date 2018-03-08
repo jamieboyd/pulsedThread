@@ -184,10 +184,7 @@ static PyObject* pulsedThread_getTrainFrequency (PyObject *self, PyObject *PyPtr
 static PyObject* pulsedThread_getTrainDutyCycle (PyObject *self, PyObject *PyPtr) {
     pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
     return Py_BuildValue("f", threadPtr -> getTrainDutyCycle());
-}
-
-
-/*-------------------------------------------------------EndFunc utilities--------------------------------------------------------------------------------------------
+}-----------------------------------------EndFunc utilities--------------------------------------------------------------------------------------------
 we can check if an endFunc is installed and un-install an end func without knowing anything about the endFunc */
 
 // checks if this pulsed thread is set to run an endFunc

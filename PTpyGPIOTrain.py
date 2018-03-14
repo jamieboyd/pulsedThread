@@ -47,7 +47,7 @@ class PT_Py_GPIO_train (object):
         
     def TurnOnEndFunc (self, p_period):
         self.periodArray = array ('f', [0] * 1000)
-        ptPyFuncs.cosDutyCycleArray(self.periodArray, 500, 0.6, 0.4)
+        ptPyFuncs.cosDutyCycleArray(self.periodArray, 100, 0.6, 0.4)
         self.period = p_period
         self.iArray = 0
         #ptPyFuncs.setArrayEndFunc(self.task_ptr, self.periodArray, 0, 0)
@@ -82,6 +82,7 @@ if __name__ == '__main__':
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
     try:
+        print ("ACC_MODE_SLEEPS")
         train1 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 60, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS, 23)
     except Exception as e:
         print (e);
@@ -90,3 +91,24 @@ if __name__ == '__main__':
         train1.DoTrains (200)
         train1.WaitOnBusy (100)
         del (train1)
+        print ("ACC_MODE_SLEEPS_AND_SPINS")
+    try:
+        train2 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 60, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS_AND_SPINS, 23)
+    except Exception as e:
+        print (e);
+    else:
+        train2.TurnOnEndFunc (100)
+        train2.DoTrains (200)
+        train2.WaitOnBusy (100)
+        del (train2)
+
+    try:
+        print ("ACC_MODE_SLEEPS_AND_OR_SPINS")
+        train3 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 60, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS_AND_OR_SPINS, 23)
+    except Exception as e:
+        print (e);
+    else:
+        train3.TurnOnEndFunc (100)
+        train3.DoTrains (200)
+        train3.WaitOnBusy (100)
+        del (train3)

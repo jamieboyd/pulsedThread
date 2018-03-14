@@ -60,19 +60,20 @@ class PT_Greeter (object):
  
 if __name__ == '__main__':
     try:
-        myGreeter =  PT_Greeter (PT_Greeter.ACC_MODE_SLEEPS, "C++ python interfacing")
+        myGreeter =  PT_Greeter (PT_Greeter.ACC_MODE_SLEEPS_AND_SPINS, "C++ python interfacing")
     except Exception as e:
         print (e)
         quit()
-    print ("Default number of greetings = ", myGreeter.get_num_greets ())
-    print ("Default hello time is ",  myGreeter.get_hello_time(), ' seconds')
+    #print ("Default number of greetings = ", myGreeter.get_num_greets ())
+    #print ("Default hello time is ",  myGreeter.get_hello_time(), ' seconds')
     print ("Default goodbye time is ",  myGreeter.get_goodbye_time(), ' seconds')
     myGreeter.set_hello_time (0.25)
     myGreeter.set_goodbye_time (1)
     myOtherGreeter =  PT_Greeter (PT_Greeter.ACC_MODE_SLEEPS, "the other greeter")
-    myOtherGreeter.set_hello_time (0.5)
+    myOtherGreeter.set_hello_time (1)
     myOtherGreeter.set_goodbye_time (2)
     myOtherGreeter.set_num_greets (5)
+    myGreeter.set_num_greets (11)
     myGreeter.greet()
     myOtherGreeter.greet()
 
@@ -80,7 +81,7 @@ if __name__ == '__main__':
     while (myGreeter.is_greeting () > 0 and myOtherGreeter.is_greeting () > 0):
         for i in range (1,10000):
             result += (i*i/(i + 1))
-        print ('result = ', result)
+        #print ('result = ', result)
         
                         
     print ('Greeters are finished now. Final result was', result)

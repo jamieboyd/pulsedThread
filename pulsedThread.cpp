@@ -109,9 +109,10 @@ extern "C" void* pulsedThreadFunc (void * tData){
 		}
 		// we are done with modding doTask, so unlock the mutex
 		pthread_mutex_unlock (&theTask->taskMutex);
-		 // initalize spinEndTime to current time
-		if (theTask->accLevel > 0)
+		 // initalize spinEndTime to current time once for 
+		if (theTask->accLevel == ACC_MODE_SLEEPS_AND_OR_SPINS){
 			gettimeofday (&spinEndTime, NULL);
+		}
 		// do the task(s) as per nPulses
 		switch (theTask->nPulses){
 			case kPULSE:
@@ -119,10 +120,13 @@ extern "C" void* pulsedThreadFunc (void * tData){
 					if  (theTask ->accLevel ==ACC_MODE_SLEEPS){
 						nanosleep (&delaySleeper, NULL);
 					}else{
-						timeradd (&spinEndTime, &pulseDelayUsecs, &spinEndTime);
+						
 						if  (theTask ->accLevel ==ACC_MODE_SLEEPS_AND_SPINS){
+							gettimeofday (&spinEndTime, NULL);
+							timeradd (&spinEndTime, &pulseDelayUsecs, &spinEndTime);
 							WAITINLINE1 (delaySleeps, &delaySleeper, &spinEndTime);
 						}else{
+							timeradd (&spinEndTime, &pulseDelayUsecs, &spinEndTime);
 							WAITINLINE2 (delaySleeps, &turnaroundTime, &spinEndTime);
 						}
 					}
@@ -131,10 +135,13 @@ extern "C" void* pulsedThreadFunc (void * tData){
 				if (theTask ->accLevel == 0){
 					nanosleep (&durSleeper, NULL);
 				}else{
-					timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
+					
 					if  (theTask ->accLevel ==ACC_MODE_SLEEPS_AND_SPINS){
+						gettimeofday (&spinEndTime, NULL);
+						timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
 						WAITINLINE1 (durSleeps, &durSleeper, &spinEndTime);
 					}else{
+						timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
 						WAITINLINE2 (durSleeps, &turnaroundTime, &spinEndTime);
 					}
 				}
@@ -192,10 +199,13 @@ extern "C" void* pulsedThreadFunc (void * tData){
 				if (theTask ->accLevel == 0){
 					nanosleep (&durSleeper, NULL);
 				}else{
-					timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
+					
 					if  (theTask ->accLevel ==ACC_MODE_SLEEPS_AND_SPINS){
+						gettimeofday (&spinEndTime, NULL);
+						timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
 						WAITINLINE1 (durSleeps, &durSleeper, &spinEndTime);
 					}else{
+						timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
 						WAITINLINE2 (durSleeps, &turnaroundTime, &spinEndTime);
 					}
 				}
@@ -206,10 +216,13 @@ extern "C" void* pulsedThreadFunc (void * tData){
 					if  (theTask ->accLevel ==ACC_MODE_SLEEPS){
 						nanosleep (&delaySleeper, NULL);
 					}else{
-						timeradd (&spinEndTime, &pulseDelayUsecs, &spinEndTime);
+						
 						if  (theTask ->accLevel ==ACC_MODE_SLEEPS_AND_SPINS){
+							gettimeofday (&spinEndTime, NULL);
+							timeradd (&spinEndTime, &pulseDelayUsecs, &spinEndTime);
 							WAITINLINE1 (delaySleeps, &delaySleeper, &spinEndTime);
 						}else{
+							timeradd (&spinEndTime, &pulseDelayUsecs, &spinEndTime);
 							WAITINLINE2 (delaySleeps, &turnaroundTime, &spinEndTime);
 						}
 					}
@@ -230,10 +243,12 @@ extern "C" void* pulsedThreadFunc (void * tData){
 					if (theTask ->accLevel == ACC_MODE_SLEEPS){
 						nanosleep (&durSleeper, NULL);
 					}else{
-						timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
 						if  (theTask ->accLevel ==ACC_MODE_SLEEPS_AND_SPINS){
+							gettimeofday (&spinEndTime, NULL);
+							timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
 							WAITINLINE1 (durSleeps, &durSleeper, &spinEndTime);
 						}else{
+							timeradd (&spinEndTime, &pulseDurUsecs, &spinEndTime);
 							WAITINLINE2 (durSleeps, &turnaroundTime, &spinEndTime);
 						}
 					}
@@ -243,10 +258,12 @@ extern "C" void* pulsedThreadFunc (void * tData){
 					if  (theTask ->accLevel ==ACC_MODE_SLEEPS){
 						nanosleep (&delaySleeper, NULL);
 					}else{
-						timeradd (&spinEndTime, &pulseDelayUsecs, &spinEndTime);
 						if  (theTask ->accLevel ==ACC_MODE_SLEEPS_AND_SPINS){
+							gettimeofday (&spinEndTime, NULL);
+							timeradd (&spinEndTime, &pulseDelayUsecs, &spinEndTime);
 							WAITINLINE1 (delaySleeps, &delaySleeper, &spinEndTime);
 						}else{
+							timeradd (&spinEndTime, &pulseDelayUsecs, &spinEndTime);
 							WAITINLINE2 (delaySleeps, &turnaroundTime, &spinEndTime);
 						}
 					}
@@ -425,13 +442,13 @@ void pulsedThread::DoTasks(unsigned int nTasks){
 /* ************ countermands currently requested tasks ***************************************
  The thread will finish the current pulse or train of pulses then stop
  Last Modified:
+2018/03/13 by jamie Boyd - deleted some fancy schmancy stuff to work around high order bits - because it wasn't working, for some reason
 2018/02/14 by Jamie Boyd - made sure one task was set for thread to unset, else doTask might go negative
  2018/02/09 by Jamie Boyd - initial Version */
 void pulsedThread::UnDoTasks (void){
-    if (theTask.doTask &~kMODANY) { // no need to do anything unless 1 or more tasks still left to do
+    if (theTask.doTask > 1) { // no need to do anything unless 1 or more tasks still left to do
         pthread_mutex_lock (&theTask.taskMutex);
-        theTask.doTask &= kMODANY; // unset all tasks
-	 theTask.doTask |= 1; // reset one task; thread will unset it when it finishes the current task 
+	theTask.doTask =1;
         pthread_cond_signal(&theTask.taskVar);
         pthread_mutex_unlock( &theTask.taskMutex);
     }
@@ -452,12 +469,15 @@ waits until a thread is no longer doing a task, then returns
 Last modified:
 2016/12/09 by Jamie Boyd - added paramater for timeout, and added return value for timed out vs not busy */
 int pulsedThread::waitOnBusy(float waitSecs){
-	struct timespec delaySleeper;
-	configureSleeper (1.01 * kSLEEPTURNAROUND, &delaySleeper);
+	struct timespec Sleeper;
+	configureSleeper (1.01 * kSLEEPTURNAROUND, &Sleeper);
 	unsigned int nWait = (waitSecs * 1e06)/(1.01 * kSLEEPTURNAROUND);
-	int taskNum =0 ;
+	int taskNum;
+	pthread_mutex_lock (&theTask.taskMutex);
+	taskNum = theTask.doTask;
+	pthread_mutex_unlock( &theTask.taskMutex);
 	for (unsigned int ii =0; ii < nWait ; ii+=1){
-		nanosleep (&delaySleeper, NULL);
+		nanosleep (&Sleeper, NULL);
 		pthread_mutex_lock (&theTask.taskMutex);
 		taskNum = theTask.doTask;
 		pthread_mutex_unlock( &theTask.taskMutex);

@@ -49,7 +49,7 @@ than 500 million (2^29 -1 =536,870,911 which "should be enough for anybody" */
 const unsigned int kMODDELAY = 536870912; 		//2^29
 const unsigned int kMODDUR = 1073741824;		//2^30
 const unsigned int kMODCUSTOM = 2147483648;	//2^31
-const unsigned int kMODANY = 3221225530;		//2^29 + 2^30 + 2^31
+const unsigned int kMODANY = 3758096384;		//2^29 + 2^30 + 2^31
 
 /* ***************this C-style struct contains all the relevant thread variables and task variables, and is passed to the thread function *********
 last modified:

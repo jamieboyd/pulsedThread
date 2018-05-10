@@ -1,0 +1,305 @@
+Welcome to the pulsedThread wiki!
+
+PulsedThread is a C++ class that uses the POSIX pthread library to set up and control a threaded task for precise, independent timing of events that can be categorized as pulses or trains of pulses; the events correspond to transitions between the HIGH periods and LOW periods of the pulses.
+
+PyPulsedThread is a collection of functions for controlling a pulsedThread object wrapped in a PyCapsule. It is useful for building Python C-modules controlling pulsedThread objects.
+
+PulsedThread was originally written to control Raspberry Pi GPIO hardware. The GPIO_Thread project uses the pulsedThread class to make Python C++ modules that output independently timed pulses or trains of pulses on standard GPIO pins, including running a 2-phase stepper motor, and to output wave forms or control a servo-motor using the PWM peripheral.
+
+A define statement in pulsedThread.h,
+
+#define beVerbose 1
+enables printing of messages that may be useful for debugging or understanding how the code runs. Define beVerbose as 0 to turn off this printing.
+
+1) Pulsed Thread Events and Timing
+
+Instances of the pulsedThread class control periodic timing of events in a pulsed fashion where a "set high" event happens at the start of each pulse and a "set low" event happens after the pulse duration, with a delay between pulses. You define pulse duration and delay, the number of pulses, and the set high and set low events. The high and low events are defined by function calls; each pulsedThread object is initialized with a pair of function pointers for the functions that are called on the "High" and "Low" events. These functions will be referred to as HiFunc and LoFunc.
+
+Three types of events are supported: single pulses, trains of a defined number of pulses, and infinite trains of an unlimited number of pulses. A single pulse waits for the delay, runs the HiFunc, waits for the duration, and runs the LowFunc. You need to initialize a task in the low state. Remember that "high"and "low" are notional, not actual descriptions, so programming a high-to-low pulse is as simple as swapping the HiFunc with the LowFunc. A train repeatedly runs the HiFunc and waits for the duration, then runs the LowFunc and waits for the delay, repeating for a defined number of pulses. An infinite train has no set number of pulses, but can be stopped and restarted arbitrarily. These three event types are indicated by constants in the code as follows:
+
+kPULSE=1. Waits for delay, calls HiFunc, waits for duration, calls LoFunc
+kTRAIN=2. Calls hiFunc, waits for duration, if Delay > 0, calls loFunc and waits for delay, repeats for set number of Pulses
+kINFINITETRAIN=0. Calls hiFunc, waits for duration, calls loFunc and waits for delay, repeats until requested to stop
+Pulse timing is controlled with the system microsecond timer and the nanosleep function. Three methods of timing are provided, of increasing accuracy and processor use. The first method is for the thread to sleep for the entire time of a pulse duration. This method requires the least amount of processor time, but it ignores both the time it takes for the Hi and Lo functions to run, and the non-zero, and variable, time that it takes for a sleeping thread to wake. Nonetheless, it may be accurate enough for many purposes. A more accurate but more processor intensive method is for the thread to calculate and record the end time of each duration, sleep for the requested duration minus some small constant time, and upon awakening, repeatedly check the time in a tight loop until the duration has ended. For Hi and Lo events that may take long relative to pulse timing, or be of variable duration, a third timing method is available that re-calculates the sleep period for each duration, and can can countermand sleeping/spinning at all if a thread is running behind schedule. These three methods are indicated as constants in the code.
+
+ACC_MODE_SLEEPS=0. Thread sleeps for duration of period
+ACC_MODE_SLEEPS_AND_SPINS=1. Thread sleeps for period - kSLEEPTURNAROUND microseconds,then spins for remaining time
+ACC_MODE_SLEEPS_AND_OR_SPINS=2. Sleep time is re-calculated for each duration, sleep is countermanded if thread is running late
+The amount of time we subtract from the sleep period is set by another constant in the code:
+
+kSLEEPTURNAROUND=200. How long, in microseconds, we aim to spin at the end of pulse timing in the second and third accuracy levels. Making this time longer may improve accuracy; making it shorter will decrease processor usage.
+2) Pulsed Thread Data Structures
+
+The pulsedThread code uses a mix of C++ class methods and C-style functions and structures to use the pthread C library with the convenience of C++ classes. Each pulsedThread object starts a separate thread running the function pulsedThreadFunc and communicates with the thread through a taskParams structure that the pulsedThread instance creates and that both the pulsedThread instance and its associated pthread can access. The fields of the taskParams structure are:
+
+accLevel. This value sets the method that the thread uses to control pulse timing. Threads can: 0) sleep for pulse duration/delay, 1) sleep for most of the delay duration, waking up and looping for the last few hundred microseconds (controlled by constant kSLEEPTURNAROUND), or 2) re-calculate sleep time for each duration/delay, and completely countermand sleeping if thread is running late.
+
+doTask. The lower 29 bits of this 32 bit unsigned integer are used for setting/tracking number of tasks requested/left to do. Changes to this variable are made after calling pthread_mutex_lock, and the thread is signalled that a change has been made with pthread_cond_signal. The thread sleeps when doTask is zero, and wakes when doTask is non zero. For a finite length train or a pulse task, the thread starts doing its task, decrementing doTask as it completes each task (single pulse or train), and sleeps again when doTask gets to 0. For an infinite train, the thread starts when doTask =1 and stops the train when doTask = 0, but as it only reads and never writes to doTask, locking the mutex is not required.
+
+The upper 3 bits of dotask are reserved for alerting the thread that pulse delay, pulse duration, or custom thread data have been changed:
+
+const unsigned int kMODDELAY = 536870912;    2^29
+const unsigned int kMODDUR = 1073741824;     2^30
+const unsigned int kMODCUSTOM = 2147483648;  2^31
+Setting any of these these bits from the pulsedThread instance causes the thread to be woken up and it will change timers for delay/duration or call the custom task modification function and then unset the bits.
+
+Pulse Description (as number and timing of pulses)
+
+pulseDelayUsecs. The duration of "low" time in microseconds, can be 0. For a train or infinite train,(but not for a single pulse), setting pulseDelayUsecs = 0 means the loFunc is never called.
+pulseDurUsecs. The duration of high time in microseconds, must be > 0. If your task is periodic, but not a pulse with defined "high" and "low", set pulseDelayUsecs to 0 and control timing with pulseDurUsecs only.
+nPulses. The number of pulses in a train. Can be 0 for an infinite train, 1 for a single pulse, >=2 for a train of defined length.
+Train Description (as Duration, Frequency, and Duty Cycle)
+
+trainDuration. The duration of train, in seconds, or 0 for an infinite train
+trainFrequency. The frequency in Hz, i.e., pulses/second
+trainDutyCycle. PulseDurUsecs/(pulseDurUsecs + pulseDelayUsecs), ranges between 0 to 1
+Note that the description of the timing of the task is kept in two redundant formats: 1) pulse delay and duration in microseconds, and number of pulses, as actually used by the thread, and 2) train frequency duration, train frequency, and train duty cycle. This duplication is for the benefit of functions that, for example, change train frequency without changing train duration by modifying the number of pulses.
+
+Task Custom Data and Functions
+
+taskData. A pointer to data customized for the thread's main task, running HiFunc and LoFunc. Any needed data other than pulse timing and number are accessed with this pointer. It needs to be initialized when the thread is started, with anything from a single value to a large structure, depending on what the task of the thread needs.The loFunc and hiFunc are both passed this pointer. Remember that the pulsedThread instance can access this data as well, so it can be used to return data as well as control a thread. If the pulsedThread instance writes to the parts of taskData used by the pthread function, you may wish to use the mutex for protection.
+endFuncData. A pointer to data customized for an endFunction, if one is installed. Made separate from taskData so that handling of endFunctions and associated data can be independent of HiFunc and LoFunc task data. That is, you can have an endFunction that is task agnostic.
+loFunc. Pointer to the function that runs at the low part of pulse, it gets pointer to taskData.
+hiFunc. Pointer to the function that runs at high part of pulse, it also gets a pointer to taskData
+endFunc. Pointer to optional function that can be set to run at the end of every task. Thus, it would run at the end of a train (nPulses >= 2), or at the end of each pulse for an infinite train or single pulse. The task structure includes a pointer specifically for data used by an endFunction, but the endFunction gets the pointer to the whole task structure, so it may be used, e.g, to change task timing.
+modCustomData. A pointer to data to be used by a modCustomFunc to modify the task data or endFunc data. Needs to be initialized before modCustomFunc is called.
+modCustomFunc. A pointer to an optional function used to modify custom task or endFunc data. Gets a pointer to modCustomData and taskParams. The thread function calls this function when when kMODCUSTOM is set in doTask.
+pthread data
+
+taskThread. A pthread structure, initialized when thread is created, freed in pulsedThread destructor
+taskMutex. A pthread_mutex_t, mutex that is used in the lock and unlock operations to prevent simultaneous writing by the thread and the pulsedThread object to doTask or perhaps taskData or endFuncData.
+taskVar. A pthread_cond_t conditon variable used to signal from pulsedThread instance to the pthread that doTask has been modified and there is work to do. The thread uses the pthread_cond_wait function to sleep until a task has been called, then does the task(s)and sleeps again.
+3) PulsedThread Constructors
+
+There are two constructors for the pulsedThread class, one sets thread timing based on integer numbers of microseconds for delay, duration, and number of pulses. The other sets pulse timing based on floating point values for frequency (Hz), duty cycle (0 to 1) and train duration (seconds). Each integer specified timing has a unique floating point representation, and vice versa, within the extent of rounding errors. Saving timing information in both formats in the taskParams structure is redundant, but allows easy conversions between the two modes of description. The ticks2times and times2ticks utility functions are used to convert between the two formats.
+
+pulsedThread::pulsedThread (unsigned int gDelay, unsigned int gDur, unsigned int gPulses, void *initData, int (*initFunc)(void *, void * volatile &), void (*gLoFunc)(void * volatile), void (*gHiFunc)(void * volatile),int gAccLevel,int &errCode)
+pulsedThread::pulsedThread (float gFrequency, float gDutyCycle, float gTrainDuration, void *initData, int (*initFunc)(void *, void * volatile &), void (*gLoFunc)(void * volatile), void (*gHiFunc)(void * volatile),int gAccLevel,int &errCode)
+(first 3 params using Integer values - make sure to cast all 3 parameters to unsigned int)
+unsigned int gDelay - for a single pulse, delay until HiFunc runs, in microseconds. For trains, duration between LoFunc and HiFunc
+unsigned int gDur - for a single pulse, duration between HiFunc and LoFunc that ends the pulse. For trains, duration between HiFunc and LoFunc
+unsigned int gPulses - 1 to make a pulse, 2 or greater to indicate the number of pulses in a train, or 0 to make an infinite train
+(first 3 params using floating point values - make sure to cast all 3 parameters to float)
+float gFrequency - pulse frequency in Hz
+float gDutyCycle - pulse duty cycle, from 0 < duty cycle <= 1
+float gTrainDuration - duration of the train, in seconds. set to 0 for infinite train, set to length of one pulse for a single pulse
+(Rest of the parameters, same for both constructors)
+void *initData - pointer to whatever data you want to use when initializing the pulsedThread object.
+int (*initFunc)(void *, void * volatile &) - function pointer for initialization function, or nullptr if no special initialization function is provided
+void (*gLoFunc)(void * volatile) - Your LoFunc is run on high to low transitions. It gets passed a pointer to the taskCustomData you initialized
+void (*gHiFunc)(void * volatile) - Your HiFunc is run on low to high transitions. It gets passed a pointer tothe taskCustomData you initialized
+int gAccLevel - sets the method that the thread uses to control pulse timing.
+int &errCode - reference variable that is set to 0 if no error during pulsedThread creation, else set to non-zero
+4) Initializing and Modifying Custom data
+
+The taskParams structure contains a field for a pointer to taskData, for data specific to that particular pulsedThread instance. This way, different pulsedThread objects can be running the same set of hiFunc and loFunc, but using different data (e.g., GPIO pin numbers). The taskData is initialized by the pulsedThread constructor with data from the initData parameter.
+
+The initialization data parameter is also a pointer, usually to an instance of some custom structure you created and filled in as appropriate. If you do not supply an initFunc to copy your initialization data to the taskCustomData (passing a nullptr instead of a function reference for initFunc), the constructor will simply set the taskParams->taskCustomData pointer to the initData pointer. You have to make sure that the data pointed to by the initData pointer is not destroyed when the thread may still be needing it, or modified when the pthread is busy using it. It is usually better to provide an initFunc that the constructor can then call to set the taskCustomData pointer to a newly created data structure, and copy the initData into it. That way, the function calling the constructor does not have to manage the data after creating the pulsedThread object. An initFunc gets passed a pointer to your initData, plus the taskCustomData pointer.
+
+After creating a pulsedThread, you may wish to change the custom data referenced by the taskData pointer or the endFunData pointer in the taskParams struct. That data is not something we want to be easily modified, because it is shared between the pulsedThread object and its pthread. The modCustom function can be used with the isLocking parameter to modify taskData in a thread-safe way. You pass modCustom a pointer to your data modification function (modFunc) and a pointer to the data for your modfunc to use. If isLocking is set, modCustom copies the data and function pointers into the taskParams structure and sets a flag to alert the pthread. The pthread will run the modfunc when it is not actively doing a task. This way, data will not be changed in the middle of a pulse or train. When the pthread has run the modfunc, it resets the flag. The getModCustomStatus function can be used to see if your modfunc has run. Do not delete the modData that you passed to modCustom until the function has run. You can get a pointer to your customData in taskData with getCustomData, through which you can read and even modify the taskData directly. You can also use this pointer to delete your custom data just before you kill the thread. A better method is to supply a function to delete your custom data, and then the pulsedThread destructor will run your delCustomData function (with a pointer to your custom data) in its own destructor.
+
+int modCustom (int (*modFunc)(void *, taskParams *), void * modData, int isLocking) - modifies taskData or endFuncData using your provided modFunc and pointer to your modification data, with thread-safe locking option. The parameters are:
+
+int (*modFunc)(void *, taskParams * ) - a pointer to a function that takes 2 parameters,
+a pointer to your input data,
+a pointer to the taskParams structure
+void * modData - a pointer to whatever data you want the modFunc to use
+int isLocking - flag to indicate if you want to wait for pthread to finish a task. You can set this to 0 IF you are absolutely sure the pthread will not be accessing the custom data
+int getModCustomStatus (void) - Returns 1 if the pulsedThread object is waiting for the pThread to run the modData function, else 0
+
+void * getCustomData (void) - Returns the pulsedThread's taskData pointer. Can be used to read or write the taskData. Be careful.
+
+void setCustomDataDelFunc (void(*delFunc)(void * volatile)) - saves a pointer to the passed in function that will be called to delete your custom data when the pulsedThread is killed
+
+5) Running a pulsedThread
+
+One you have made a pulsedThread, you tell it to do the pulse or train with a call to class methods DoTask or DoTasks
+
+void DoTask (void) - signals the pthread to run the configured task (pulse or train) once
+
+DoTasks(unsigned int nTasks) - signals the pthread to run the configured task nTasks times in a row
+
+DoTask increments the doTask field in the taskParams structure shared by the pulsedThread and its pthread. DoTasks will add nTasks to the doTask field. This will wake up the thread and it will perform its task, or tasks. Note that the thread will be busy for the duration of the task or tasks , but DoTask or DoTasks will return immediately, and the pulsedThread will be ready to accept other commands. Thus, you can add more task requests while the originals are still being processed. The doTask field in the taskParams structure is an unsigned 32 bit integer, but the 8 upper bits are reserved for signalling events that the thread has to respond to. This means you can request a maximum of 2^29-1=536,870,911 tasks. Two special functions, startInfiniteTrain and stopInfinteTrain, are used for starting and stopping infinite trains.
+
+void startInfiniteTrain (void) - starts a pulsedThread configured as an infinite train.
+void stopInfinteTrain(void) - stops an infinite train. it can be restarted with startInfiniteTrain without having to reconfigure it.
+You can ask if the pthread of a pulsedThread is still busy doing a task with
+
+int isBusy(void ) - returns 0 if its pthread is not currently doing a task, else returns the number of tasks still left to do. An infinite train returns 1 if it is active, 0 if it is not active.
+To wait until a pulsedThreads pthread is done a task, you can use
+
+int waitOnBusy(float waitSecs) - returns 0 when its pthread is no longer busy before waitSecs seconds has elapsed, or returns 1 if the pthread did not finish before the waitSecs timeout expired. Calling waitonBusy for an infinite train is allowed, and will do the expected behaviour of returning 1 after the timeout.
+6) Changing Timing and other Parameters of a Running pulsedThread
+
+There are a number of functions to change the timing of a pulsedThread task after it has already been created. As for creating the pulsedThread, the task modification function use either integer pulse number and delay/duration microseconds or frequencies, dutycycles, and train durations in floating point values. The integer functions are
+
+int modDelay (unsigned int newDelay) - modifies low time of each pulse
+int modDur (unsigned int newDurUsecs) - modifies high time of each pulse
+int modTrainLength (unsigned int newPulses) - modifies number of pulses in a train. Reducing a train's pulse number to 1 turns it into a single pulse, which reverses order of hi/low
+The frequency/dutycycle/train duration modification functions are:
+
+int modFreq (float newFreq) - changes the frequency of the pulses, in Hz, while keeping duty cycle and train duration (in seconds) constant.
+int modTrainDur (float newDur) - Changes train duration (in seconds) by changing train length (number of pulses), keeping frequency and dutycycle constant
+int modDutyCycle (float newDutyCycle) - Changes the duty cycle of the train, keeping the frequency and the train length constant.
+As can be seen, changing one of the integer parameters will change several of the floating point parameters, and changing one of the floating point parameters will change several of the integer parameters. After each modification of timing parameters, one of the ticks2Times or times2Ticks functions is called as appropriate to update the other set of parameters.
+
+The pulsedThread class has functions for getting the timing parameters, in both formats:
+
+unsigned int getNpulses (void) - returns 0 for an infinite train, the number of pulses in a finite train, or 1 for a single pulse
+
+int getpulseDurUsecs (void) - returns pulse duration (HI time) in microseconds
+
+int getpulseDelayUsecs (void) - returns pulse delay (LO time) in microseconds
+
+getTrainDuration (void) - returns train duration in seconds
+
+getTrainFrequency (void) - returns train frequency in Hz
+
+getTrainDutyCycle (void0 - returns train duty cycle (0 -1)
+
+You can also change the hiFunc and loFunc functions by changing the function pointers stored in the taskParams structure:
+
+setLowFunc (void (*loFunc)(void * volatile)) - sets function to run for Lo events
+
+setHighFunc (void (*hiFunc)(void * volatile)) - sets function to run for Hi events
+
+The hiFunc and loFunc functions take a void pointer, which, when the functions are called, will be pointing to the customData initialized by the initFunc.
+
+7) Using End-Functions
+
+An end-function is another function you supply, like the hiFunc and loFunc functions. The end-Function is called only at the end of a task. This is most useful for a train where you want to change some aspect of the train at the end of each train, but not after every pulse in the train. The end function is passed a pointer to the entire taskParams structure, not just your custom data:
+
+setEndFunc (void (*endFunc)(taskParams *)) - Sets the endFunc pointer in taskParams structure to address of your function
+
+unSetEndFunc (void) - Sets the endFunc pointer in taskData structure to nullptr
+
+hasEndFunc (void)	returns 1 if an endFunc is currently installed, else 0 if endFunc pointer in taskData structure is NULL
+
+8) Installing the pulsedThread Library
+
+Making the C++ library is done with the provided make file
+
+make - compiles the library
+sudo make install - copies the compiled library to usual places and also the header files to the usual place.
+9) A Minimal Application Example
+
+The file Greeter.cpp contains code for a small test application that demonstrates making and using a pulsedThread object with hiFunc and lowFunc that simply print some information. Aside from main, Greeter.cpp contains the HI, LO, and INIT functions, and the definition of a structure to hold the custom data. Walking through the code:
+
+We first make a ptTestStruct to use for initialization. The ptTestStruct has two fields: a character array to hold the name part of the message to print, and an integer that we use to track the number of times a message is printed. We use the same structure type for initialization of the custom data as we will use for the custom data itself, but that is not generally the case.
+
+We call the pulsedThread constructor with the addresses of the ptTestStruct we just made and of our Hi, Lo, and Init functions, plus timing information on the duration and delay of each pulse (0.5 seconds each), and the number of pulses (a train of 10). Note that we use the integer microsecond delay, microsecond duration, and number of pulses version of the constructor. Also passed to the constructor are a value for pulse timing mode and a pass-by-reference errVar will be set to a non-zero value if the pulsedThread can not be created. The pThread constructor makes a taskParams struct. The constructor calls our INIT function, ptTest_Init, with the pointer to the pttestStruct we passed it, plus a a pointer to the taskCustomData field in the taskParams struct. ptTest_Init initializes the taskCustomData pointer to a new ptTestStruct, initializes the times field of the new pttestStruct to 0, and and copies over the name field from the initialization struct. Finally, the constructor will create the pthread and start the pthread function running, waiting for tasks to be requested.
+
+We then make another pulsedThread, requesting another train running half the speed of the first one, and with a different name. We ask both threads to output a train. Each pulsedThread object sets the doTask variable in its taskParams struct to 1 to signal its pthread to do the train. The pthread times the pulses and calls the HI and LO functions as appropriate. The HI and LO functions are called with a void pointer to the customData made by the initialization function. The HI and LO functions cast the pointer to a ptTestStructPtr and print a message that contains the name from the character array in the ptTestStruct. The LO function also increments the count in the times field.
+
+After the pulsedThreads are started, we run a loop that does some arbitrary calculation and periodically prints the results to show that we can do real work in the main thread while the pthreads run independently. From the loop, we call the isBusy method so we can exit the loop and the program when both pulsedThreads have finished their task.
+
+The file minimalGreeter.cpp shows the bare minimum of functions needed to use the pulsedThread library, containing a main function that makes a pulsedThread and runs it, a hiFunc, but no loFunc, no initFunc, and no definition of a customData structure.
+
+You can compile the Greeter application, after installing the pulsedThread library, with: make greeter which runs the compiler command: g++ -O3 -std=gnu++11 -lpulsedThread Greeter.cpp -o Greeter
+
+You can compile the MinimalGreeter application, after installing the pulsedThread library, with: make minimalGreeter which runs the compiler command:
+g++ -O3 -std=gnu++11 -lpulsedThread minimalGreeter.cpp -o MinimalGreeter
+
+10) Using pulsedThread in a Python C++ Module
+
+To use the pulsedThread C++ library in a Python module, you can start with the wrapper functions provided in the file pyPulsedThread.h. These functions are designed to work with a pulsedThread object on the C++ side of things and a PyCapsule object containing a pointer to that pulsedThread object on the Python side of things. For general information on writing Python C modules, see the Python/C API Reference Manual at https://docs.python.org/3.4/c-api/index.html.
+
+As when using pulsedThread directly from C++, you must supply at minimum the C++ functions for initialization of the taskCustom data, and HI and LO event functions. You must also supply a Python C++ module function that makes a new pulsedThread using your initialization and HI and LO functions. This function must return to Python a PyCapsule that wraps a pointer to your pulsedThread object. From Python, you pass that PyCapsule as a parameter to functions from pyPulsedThread.h that interact with the pulsedThread object, asking it to do tasks and configure pulse/train timing.
+
+Wrappers for almost all of the pulsedThread library control functions and setters and getters are provided. They are called from Python as follows:
+
+isBusy (PyCapsule pulsedThreadPtr) - Returns number of tasks a thread has left to do, 0 means finished all tasks
+
+waitOnBusy (PyCapsule pulsedThreadPtr, float timeOut) - Returns when a thread is no longer busy, or after timeOut secs
+
+doTask (PyCapsule pulsedThreadPtr) - Tells the pulsedThread object to do whatever pulse or train it was configured for
+
+doTasks (PyCapsule pulsedThreadPtr, int numTasks) - Tells the pulsedThread object to do whatever pulse or train it was configured for numTasks times without stopping in between.
+
+startTrain (PyCapsule pulsedThreadPtr) - Tells a pulsedThread object configured as an infinite train to start
+
+stopTrain (PyCapsule pulsedThreadPtr) - Tells a pulsedThread object configured as an infinite train to stop
+
+modDelay (PyCapsule pulsedThreadPtr, int delay) - sets the delay period of a pulse or LOW period of a train
+
+modDur (PyCapsule pulsedThreadPtr, int delay) - changes the duration period of a pulse or HIGH period of a train
+
+modTrainLength (PyCapsule pulsedThreadPtr, int length) - changes the number of pulses of a train
+
+modTrainDur (PyCapsule pulsedThreadPtr, float time) - changes the total time duration of a train bychanging number of pulses
+
+modTrainFreq (PyCapsule pulsedThreadPtr, float freq) - changes the frequency of a train preserving duty cycle and time duration
+
+modTrainDuty (PyCapsule pulsedThreadPtr, float duty) - changes the duty cycle of a train
+
+getPulseDelay (PyCapsule pulsedThreadPtr) - returns pulse delay, LO time of a train, in seconds
+
+getPulseDuration (PyCapsule pulsedThreadPtr) - returns pulse duration, HI time of a train, in seconds
+
+getPulseNumber (PyCapsule pulsedThreadPtr) - returns number of pulses in a train, 1 for a single pulse, or 0 for an infinite train
+
+getTrainDuration (PyCapsule pulsedThreadPtr) - returns time duration of a train, in seconds
+
+getTrainFrequency (PyCapsule pulsedThreadPtr) - returns frequency of a train, in Hz
+
+getTrainDutyCycle (PyCapsule pulsedThreadPtr) - returns duty cycle of a train, ratio of HI time to (HI + LO time),between 0 and 1
+
+unsetEndFunc (PyCapsule pulsedThreadPtr) - un-sets any end function set for this pulsed thread. Each module must provide its own function for setting an end function.
+
+hasEndFunc (PyCapsule pulsedThreadPtr) Returns the endFunc status (1=installed or 0=not installed) for a pulsed thread
+
+11) Sample Python C++ Module Example
+
+The file pyGreeter.cpp makes a simple Python C++ module using pyPulsedThread.h. pyGreeter.cpp provides a single function that makes a pulsedThread object and returns a pyCapsule containing a pointer to it.
+
+pulsed_C_Greeter (PyObject *self, PyObject *args);
+The parameters passed to this function from Python are a string for a name, and an integer for timing mode. The C module interface passes them to C++ as a pointer to a python object, PyObject *args, and the C module interface function PyArg_ParseTuple is used to parse it into a string and an integer.
+
+const char * localName;
+int accLevel;
+PyArg_ParseTuple(args,"is",  &accLevel, &localName));
+pulsed_C_Greeter makes a new pulsedThread object using the same init, hi, and lo functions, ptTest_Init, ptTest_Hi, and ptTest_Lo, that was used in Greeter.cpp, by #including the Greeter.h header file. pulsed_C_Greeter uses the microsecond delay, microsecond duration, and number of pulses method:
+
+pulsedThread * threadObj = new pulsedThread ((unsigned int)50000, (unsigned int)50000, (unsigned int)10, (void * volatile) &initStruct, &ptTest_Init, &ptTest_Lo, &ptTest_Hi, accLevel, errCode)
+
+Note that printing from the C++ side of things, as done by pt_Test_Hi and ptTest_Lo, means that printed messages appear in the terminal window. This is seamless if launching Python from the terminal. If using an environment like IDlE, launch it from a terminal window, not from the menu, with: idle3 & Then the messages from the C++ module will appear in the terminal window from which IDlE was launched.
+
+Finally, pulsed_C_Greeter returns to Python a PyCapsule wrapping the pulsedThread object:
+
+return PyCapsule_New (static_cast <void *>(threadObj), "pulsedThread", pulsedThread_del);
+You can build the module ptGreeter with the provided Python setup script.
+
+python3 setup_ptGreeter.py build_ext --inplace
+
+Use "build_ext --inplace" instead of "install" to install it in the local folder so you can easily delete it after building it and running it, as it is not useful enough to be a permanently installed library.
+
+The Python code in PTGreeter.py demonstrates making a wrapper providing a "Pythonic" interface, the class PT_Greeter, for an external module based on the C++ pulsedThread library, in this case ptGreeter. A PTGreeter object contains a field, task_ptr, for a PyCapsule object containing a pointer to a pulsedThread object on the C++ side. The main function works similarly to that of the C++ program described in Greeter.cpp. It makes two pulsedThreads that print greetings, and sets them running at the same time. Then it starts doing calculations and printing results in a loop.
+
+12) ptPyFuncs: pulsedThreads with Python Functions
+
+ptPyFuncs is a Python C++ module that allows you to use the pulsedThread C++ library from Python for threading and timing of Python tasks without writing and compiling a dedicated Python C++ module. ptPyFuncs provides functions to initialize a pulsedThread with a Python object that has HiFunc, LoFunc, and (possibly) endFunc methods.
+
+ptPyFuncs.initByPulse (Python object, int lowTicks, int highTicks,int nPulses, int ACClevel)
+ptPyFuncs.initByFreq (Python object, frequency, duty Cycle, float train duration, accuracy_level)
+In both cases, the first argument is a Python object that MUST have methods named exactly "HiFunc" and "LoFunc" that don't take extra parameters other than self. The other parameters for initialization are for thread timing which is done as usual in C++ as described earlier. Now, however, the high, low and end functions are callbacks to the Python object's HiFunc, LoFunc, and EndFunc, and thus run in Python with full access to the Python environment. Yes, with some care, a Python C module can call Python functions, even from separate C threads. The Python interpreter runs only one thread at a time and uses a Global Interpreter Lock (GIL) to arbitrate which thread is currently running. The code in ptPyFuncs uses Python/C API functions PyGILState_Ensure to get the lock before calling any Python functions and PyGILState_Release to release the lock when finished. It is possible to end up in a deadlock if, for instance, a C module function gets the GIL and then calls a Python function that calls another C module function that also tries to get the GIL.
+
+As described before, both init functions return a PyCapsule object wrapping the C++ pulsedThread object, allowing it to be controlled with the entire set of functions from pyPulsedThread.h. Setting timing and requesting tasks functions as before.
+
+You can change the Python object whose functions the pulsedThread C++ object calls with:
+
+ptPyFuncs.setTaskObject(PyCapsule, Python Object)
+The first argument is the Python pyCapsule that points to the pulsedThread, and the second argument is a Python object providing the HI and LO functions, as described previously.
+
+You can set an endFunction from a Python object, which can be the same object as used for the task, with:
+
+ptPyFuncs.setEndFunctionObject(PyCapsule, Python Object, functionParamType)
+The Python Object must have a method named exactly "EndFunc" that gets passed 4 parameters describing pulse number and timing. If functionParamType is 0, the endFunc is called with with microseond pulse delay, duration, and number of pulses as the first three parameters. If functionParamType is non-zero, the endFunc is called with train frequency, duty cycle, and train length. In either case, the 4th parameter is the number of tasks left to be done.
+
+You can install the ptPyFuncs module from a terminal with:
+
+sudo python3 setup_pyPTpyFuncs.py install
+PT_Py_Greeter is a Python class that uses ptPyFuncs to, what else, print hellos and goodbyes. Only now, printing is done within the Python environment by Python objects.
+
+The PT_Py_Greeter class field task_ptr is a pyCapsule that points to a pulsedThread object on the C++ side of things. All the calls to the C++ code is through an object's task_ptr, which is created in the PT_Py_Greeter init method.
+
+The main function makes a PT_Py_Greeter and sets it going, then does some calculations in a loop, printing results as it goes, to show the independence of the threaded PT_Py_Greeter from the main code.The class field PSEUDO_MUTEX is used for preventing print statements from different places in the code from executing at the same time, which would lead to garbled output. Unlike a real mutex, execution is not halted while waiting on the PSEUDO_MUTEX, hence the loops with calls to sleep to allow the other threads of execution to continue while waitng for the PSEUDO_MUTEX to be free. Also, read/write to the PSEUDO_MUTEX is not atomic; one thread may read PSEUDO_MUTEX as 0, and set it to 1, but in the very brief interval between reading and writing to PSEUDO_MUTEX, another thread may have read PSEUDO_MUTEX as 0 and so both threads would think they have the mutex.

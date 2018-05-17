@@ -56,7 +56,7 @@ last modified:
 2018/02/05 by Jamie Boyd - added separate pointer for endFunc data as separate from taskData */
 struct taskParams {
 	int accLevel; // sleeps, sleeps and spins, sleeps and/or spins.
-	int doTask; // incremented when tasks are requested, decremented when tasks are done
+	unsigned int doTask; // incremented when tasks are requested, decremented when tasks are done
 	/* ****************************raw pulse durations and number of pulses, in microseconds *******************************************/
 	unsigned int pulseDelayUsecs; // duration of low time in microseconds, can be 0, in which case loFunc is never called for a train or infinite train
 	unsigned int pulseDurUsecs; // duration of high time in microseconds, must be > 0
@@ -66,11 +66,11 @@ struct taskParams {
 	float trainFrequency; // frequency in Hz, i.e., pulses/second
 	float trainDutyCycle; // pulseDurUsecs/(pulseDurUsecs + pulseDelayUsecs)
 	/* *****************************Hi and Lo functions, and pointer to their custom data, ********************************/
-	void (*loFunc)(void *) ; // function to run for low part of pulse, gets pointer to taskData
+	void (*loFunc)(void *); // function to run for low part of pulse, gets pointer to taskData
 	void (*hiFunc)(void *); // function to run for high part of pulse, gets pointer to taskData
 	void * taskData; // pointer to custom taskData for hi and lo functions
 	/* *************************** EndFunction and pointer to its custom data *******************************************/
-	void (*endFunc)(taskParams *); // runs at end of train, or end of each pulse for infinite train or single pulse, gets pointer to the whole task
+	void (*endFunc)(void *, taskParams *); // runs at end of train, or end of each pulse for infinite train or single pulse, gets pointers to endFunc Data, and the whole task
 	void * endFuncData; // pointer for custom data for end functions
 	/* *************** function to mod custom data and pointer to data to use with mod function ***********************/
 	int (*modCustomFunc)(void *, taskParams *); // runs when kMODCUSTOM is set in doTask

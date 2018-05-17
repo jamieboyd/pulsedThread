@@ -77,12 +77,13 @@ if __name__ == '__main__':
     myGreeter.greet()
     myOtherGreeter.greet()
 
+    i =0
     result =0
     while (myGreeter.is_greeting () > 0 and myOtherGreeter.is_greeting () > 0):
-        for i in range (1,10000):
-            result += (i*i/(i + 1))
-        #print ('result = ', result)
-        
+        result += (i*i/(i + 1))
+        if i%5000 == 0:
+            print ('result ', i, '= ', result)
+        i +=1
                         
     print ('Greeters are finished now. Final result was', result)
         

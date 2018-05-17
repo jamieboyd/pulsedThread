@@ -23,7 +23,6 @@ PSEUDO_MUTEX is not atomic; one thread may read PSEUDO_MUTEX as 0, and set it to
 between reading and writing to PSEUDO_MUTEX,another thread may have read PSEUDO_MUTEX as 0 and both
 threads think they have the mutex.
 """
-import pulsedThread
 import ptPyFuncs
 from time import sleep as sleep
 from time import time as time
@@ -78,37 +77,37 @@ class PT_Py_Greeter (object):
         PT_Py_Greeter.PSEUDO_MUTEX = 0
         
     def TurnOnEndFunc (self, mode):
-        pulsedThread.setEndFuntionObject(self.task_ptr, self, mode)
+        ptPyFuncs.setEndFuncObj(self.task_ptr, self, mode, 1)
 
     def TurnOffEndFunc (self, mode):
-        pulsedThread.unsetEndFunc (self.task_ptr)
+        ptPyFuncs.unsetEndFunc (self.task_ptr)
         
     def greet(self):
-        pulsedThread.doTask(self.task_ptr)
+        ptPyFuncs.doTask(self.task_ptr)
 
     def greet_many (self, n_trains):
-        pulsedThread.doTasks(self.task_ptr, n_trains)
+        ptPyFuncs.doTasks(self.task_ptr, n_trains)
 
     def get_goodbye_time (self):
-        return pulsedThread.getPulseDelay(self.task_ptr)
+        return ptPyFuncs.getPulseDelay(self.task_ptr)
 
     def get_hello_time (self):
-        return pulsedThread.getPulseDuration (self.task_ptr)
+        return ptPyFuncs.getPulseDuration (self.task_ptr)
 
     def get_num_greets (self):
-        return pulsedThread.getPulseNumber (self.task_ptr)
+        return ptPyFuncs.getPulseNumber (self.task_ptr)
 
     def set_num_greets (self, numGreets):
-        pulsedThread.modTrainLength (self.task_ptr, numGreets)
+        ptPyFuncs.modTrainLength (self.task_ptr, numGreets)
 
     def set_goodbye_time (self, goodbyeSecs):
-       pulsedThread.modDelay (self.task_ptr, goodbyeSecs)
+       ptPyFuncs.modDelay (self.task_ptr, goodbyeSecs)
 
     def set_hello_time (self, helloSecs):
-        pulsedThread.modDur (self.task_ptr, helloSecs)
+        ptPyFuncs.modDur (self.task_ptr, helloSecs)
         
     def is_greeting (self):
-        return pulsedThread.isBusy (self.task_ptr)
+        return ptPyFuncs.isBusy (self.task_ptr)
     
     def wait_greeting (self, delaySecs):
         """There is no ptPyFuncs.waitOnBusy because of the Global interpreter Lock.
@@ -128,13 +127,15 @@ if __name__ == '__main__':
     pyGreeter.TurnOnEndFunc (PT_Py_Greeter.END_FUNC_PULSE_MODE)
     pyGreeter.greet_many (3)
     result = 0
+    i = 0
     while pyGreeter.is_greeting ():
-        for i in range (1,20000):
-            result += (i*i/(i + 1))
-        while PT_Py_Greeter.PSEUDO_MUTEX == 1:
-             sleep (0.1)
-        PT_Py_Greeter.PSEUDO_MUTEX  =1
-        print ('result = ', result)
-        PT_Py_Greeter.PSEUDO_MUTEX =0
+        result += (i*i/(i + 1))
+        if i % 2000 == 0:
+            while PT_Py_Greeter.PSEUDO_MUTEX == 1:
+                 sleep (0.1)
+            PT_Py_Greeter.PSEUDO_MUTEX  =1
+            print ('result ', i, '= ', result)
+            PT_Py_Greeter.PSEUDO_MUTEX =0
+        i += 1
     print ('Greeter is finished now. Final result was', result)
     del (pyGreeter)

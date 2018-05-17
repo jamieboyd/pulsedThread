@@ -147,7 +147,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 				}
 				theTask->loFunc(theTask->taskData);
 				if (theTask->endFunc != nullptr){
-					theTask->endFunc (theTask);
+					theTask->endFunc (theTask->endFuncData, theTask);
 				}
 			break;
                 
@@ -228,7 +228,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 					}
 				}
 				if (theTask->endFunc != nullptr){
-					theTask->endFunc (theTask);
+					theTask->endFunc (theTask->endFuncData, theTask);
 				}
 			}
 			break;
@@ -270,7 +270,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 				}
 			}
 			if (theTask->endFunc != nullptr){
-				theTask->endFunc (theTask);
+				theTask->endFunc (theTask->endFuncData, theTask);
 			}
 			break;
 		}
@@ -641,7 +641,7 @@ void pulsedThread::setHighFunc (void (*hiFunc)(void *)){
 /* ***********************************************************************
 Sets function that runs at end of each pulse, or train of pulses 
 last modified 2016/12/13 by Jamie Boyd  - initial version */
-void pulsedThread::setEndFunc (void (*endFunc)(taskParams *)){
+void pulsedThread::setEndFunc (void (*endFunc)(void *, taskParams *)){
 	theTask.endFunc = endFunc;
 }
 
@@ -951,9 +951,9 @@ int pulsedThreadSetArrayLimitsCallback (void * modData, taskParams * theTask){
 /* ************************ EndFunc sets Train Frequency from Array in endFunc data ***************************************
 last Modified:
 2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data */
-void pulsedThreadFreqFromArrayEndFunc (taskParams * theTask){
+void pulsedThreadFreqFromArrayEndFunc (void * endFuncData, taskParams * theTask){
 	// cast endFunc data pointer to pulsedThreadArrayStructPtr
-	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)theTask->endFuncData;
+	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)endFuncData;
 	// move to next point in array and warap to start if needed
 	ArrayStructPtr->arrayPos +=1;
 	if(ArrayStructPtr->arrayPos == ArrayStructPtr->endPos){
@@ -969,9 +969,9 @@ void pulsedThreadFreqFromArrayEndFunc (taskParams * theTask){
 /* ************************ EndFunc sets Train Duty Cycle from Array in endFunc data ***************************************
 last Modified:
 2018/02/05 by Jamie Boyd - updated for separate pointer for endFunc Data */
-void pulsedThreadDutyCycleFromArrayEndFunc (taskParams * theTask){
+void pulsedThreadDutyCycleFromArrayEndFunc (void * endFuncData, taskParams * theTask){
 	// cast endFunc data pointer to pulsedThreadArrayStructPtr
-	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)theTask->endFuncData;
+	pulsedThreadArrayStructPtr ArrayStructPtr  = (pulsedThreadArrayStructPtr)endFuncData;
 	// move to next point in array and warap to start if needed
 	ArrayStructPtr->arrayPos +=1;
 	if(ArrayStructPtr->arrayPos == ArrayStructPtr->endPos){

@@ -83,7 +83,7 @@ if __name__ == '__main__':
     GPIO.setwarnings(False)
     try:
         print ("ACC_MODE_SLEEPS")
-        train1 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 60, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS, 23)
+        train1 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 100, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS, 23)
     except Exception as e:
         print (e);
     else:
@@ -93,7 +93,7 @@ if __name__ == '__main__':
         del (train1)
         print ("ACC_MODE_SLEEPS_AND_SPINS")
     try:
-        train2 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 60, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS_AND_SPINS, 23)
+        train2 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 200, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS_AND_SPINS, 23)
     except Exception as e:
         print (e);
     else:
@@ -104,7 +104,7 @@ if __name__ == '__main__':
 
     try:
         print ("ACC_MODE_SLEEPS_AND_OR_SPINS")
-        train3 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 60, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS_AND_OR_SPINS, 23)
+        train3 = PT_Py_GPIO_train (PT_Py_GPIO_train.INIT_FREQ, 10000, 0.01, 0.1, PT_Py_GPIO_train.ACC_MODE_SLEEPS_AND_OR_SPINS, 23)
     except Exception as e:
         print (e);
     else:
@@ -112,3 +112,4 @@ if __name__ == '__main__':
         train3.DoTrains (200)
         train3.WaitOnBusy (100)
         del (train3)
+        print ("Trains finished")

@@ -223,8 +223,8 @@ static void pulsedThread_RunPythonLoFunc (void * taskData){
 }
 
 // Runs PyObject.endFunc()  taskData is assumed to be a pointer to a python object that has a method called endFunc that takes 4 int arguments 
-static void pulsedThread_RunPythonEndFunc_p (taskParams * theTask){
-	PyObject *PyObjPtr = (PyObject *) theTask->endFuncData;
+static void pulsedThread_RunPythonEndFunc_p (void * endFuncData, taskParams * theTask){
+	PyObject *PyObjPtr = (PyObject *) endFuncData;
 	PyGILState_STATE state=PyGILState_Ensure();
 	PyObject *result = PyObject_CallMethod (PyObjPtr, "EndFunc", "(iiii)",theTask->pulseDelayUsecs, theTask->pulseDurUsecs, theTask->nPulses, theTask->doTask);
 	Py_DECREF (result);
@@ -232,8 +232,8 @@ static void pulsedThread_RunPythonEndFunc_p (taskParams * theTask){
 }
 
 // Runs PyObject.endFunc(frequency, dutyCycle, train Duration, doTask)  taskData is assumed to be a pointer to a python object that has a method called EndFunc that takes 3 float arguments and 1 int arguments
-static void pulsedThread_RunPythonEndFunc_f (taskParams * theTask){
-	PyObject *PyObjPtr = (PyObject *) theTask->endFuncData;
+static void pulsedThread_RunPythonEndFunc_f (void * endFuncData, taskParams * theTask){
+	PyObject *PyObjPtr = (PyObject *) endFuncData;
 	PyGILState_STATE state=PyGILState_Ensure();
 	PyObject *result = PyObject_CallMethod (PyObjPtr, "EndFunc", "(fffi)",theTask->trainFrequency, theTask->trainDutyCycle, theTask->trainDuration, theTask->doTask);
 	Py_DECREF (result);

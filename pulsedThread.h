@@ -103,8 +103,8 @@ typedef struct pulsedThreadArrayModStruct{
 /* *************************** Function Declarations for non-class Functions used by pthread **********************************/
 int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask);
 int pulsedThreadSetArrayLimitsCallback (void * modData, taskParams * theTask);
-void pulsedThreadFreqFromArrayEndFunc (taskParams * theTask);
-void pulsedThreadDutyCycleFromArrayEndFunc (taskParams * theTask);
+void pulsedThreadFreqFromArrayEndFunc (void *, taskParams * theTask);
+void pulsedThreadDutyCycleFromArrayEndFunc (void *, taskParams * theTask);
 void pulsedThreadArrayStructCustomDel(void * taskData);
 
 
@@ -276,7 +276,7 @@ class pulsedThread{
 		void setHighFunc (void (*hiFunc)(void *)); // sets the function that is called on high part of cycle
 		void setTaskDataDelFunc  (void (*delFunc)( void *)); // sets a function that will be run when a pulsedThread is about to be killed
 		/* ********************************* setting and unsetting endFunction **********************************************/
-		void setEndFunc (void (*endFunc)(taskParams *)); // sets the function that is called after each pulse, or after each train,gets pointer to the task
+		void setEndFunc (void (*endFunc)(void *, taskParams *)); // sets the function that is called after each pulse, or after each train,gets pointer to the task
 		void unSetEndFunc (void); //removes end func, replaces with nullptr
 		int hasEndFunc  (void); // returns 1 if an endFunc is installed, else 0
 		void setEndFuncDataDelFunc  (void (*delFunc)( void *)); // sets a function that will be run when a pulsedThread is about to be killed

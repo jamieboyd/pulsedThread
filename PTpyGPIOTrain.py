@@ -4,14 +4,14 @@
 """More testing code for ptPyFuncs - allows you to use pulsedThread C++ class with HiFunc/LoFunc and, optionally,
 endFunc from a Python object. Most of the functions in ptPyFuncs are wrappers for functions
 defined in pyPulsedThread.h. PT_Py_GPIO_train provides a simple example using ptPyFuncs
-with RPi.GPIO to time trains of pulses output on Raspberry Pi GPIO pins
+with RPi.GPIO to time trains of pulses output on Raspberry Pi GPIO pins.
 """
 
 import ptPyFuncs
 from time import time, sleep
 import RPi.GPIO as GPIO
 from array import array as array
-from math import cos, pi
+#from math import cos, pi
 
 
 class PT_Py_GPIO_train (object):
@@ -51,7 +51,6 @@ class PT_Py_GPIO_train (object):
         ptPyFuncs.cosDutyCycleArray(self.periodArray, 100, 0.6, 0.4)
         self.period = p_period
         self.iArray = 0
-        #ptPyFuncs.setArrayEndFunc(self.task_ptr, self.periodArray, 0, 0)
         ptPyFuncs.setEndFuncObj(self.task_ptr, self, 1, 1)
 
     def TurnOnEndFunc_CPP (self, p_period):

@@ -103,8 +103,8 @@ typedef struct pulsedThreadArrayModStruct{
 /* *************************** Function Declarations for non-class Functions used by pthread **********************************/
 int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask);
 int pulsedThreadSetArrayLimitsCallback (void * modData, taskParams * theTask);
-void pulsedThreadFreqFromArrayEndFunc (void *, taskParams * theTask);
-void pulsedThreadDutyCycleFromArrayEndFunc (void *, taskParams * theTask);
+void pulsedThreadFreqFromArrayEndFunc (void * endFuncData, taskParams * theTask);
+void pulsedThreadDutyCycleFromArrayEndFunc (void * endFuncData, taskParams * theTask);
 void pulsedThreadArrayStructCustomDel(void * taskData);
 
 

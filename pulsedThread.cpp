@@ -3,6 +3,7 @@
 /* ************** the thread function needs to be a C-style function, not a class method ********************************************************
 ****************************************************************************************************************************************************
 Last Modified:
+2018/05/23 by Jamie Boyd - changed infinite train while test to while (theTask->doTask & 1), so will stop with an endFunc installed
 2016/12/14 by Jamie Boyd - added endFunc */
 extern "C" void* pulsedThreadFunc (void * tData){
 	// cast tData to task param stuct pointer
@@ -152,7 +153,7 @@ extern "C" void* pulsedThreadFunc (void * tData){
 			break;
                 
 		case kINFINITETRAIN: //an infinite train - don't decrement the queue, and check for delay, duration mods without breaking
-			while (theTask->doTask > 0){
+			while (theTask->doTask & 1){
 				if (theTask->doTask & kMODANY){
 					pthread_mutex_lock (&theTask->taskMutex);
 					if (theTask->doTask & kMODDELAY){
@@ -507,11 +508,13 @@ void pulsedThread::startInfiniteTrain (void){
 /* ****************************************************************************************************
 sets doTask to 0 to signal the thread to stop train. Inifinite train is not in a position to pay attention
 to condition variable but is continuously checking doTask
-Last Modified 2015/09/28 by Jamie Boyd */
+Last Modified:
+2018/05/22 by Jamie Boyd - deleted the higher order bit cheking, it was removed from threadFunc anways 
+2015/09/28 by Jamie Boyd - initial version*/
 void pulsedThread::stopInfiniteTrain (){
-	if ((theTask.nPulses == kINFINITETRAIN) && (theTask.doTask &~kMODANY)) {
+	if ((theTask.nPulses == kINFINITETRAIN) && (theTask.doTask & 1)){
 		pthread_mutex_lock (&theTask.taskMutex);
-		theTask.doTask &= kMODANY;
+		theTask.doTask =0;
 		pthread_cond_signal(&theTask.taskVar);
 		pthread_mutex_unlock( &theTask.taskMutex);
 	}
@@ -979,7 +982,7 @@ void pulsedThreadDutyCycleFromArrayEndFunc (void * endFuncData, taskParams * the
 	}
 	// use times2Ticks to update taskParams with new timing values
 	times2Ticks (theTask->trainFrequency, ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos], theTask->trainDuration, *theTask);
-	theTask->trainDutyCycle = ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos];;
+	theTask->trainDutyCycle = ArrayStructPtr->arrayData[ArrayStructPtr->arrayPos];
 	theTask->doTask |= (kMODDUR | kMODDELAY);
 }
 

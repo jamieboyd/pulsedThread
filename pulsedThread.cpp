@@ -789,7 +789,7 @@ int pulsedThread::modCustom (int (*modFunc)(void *, taskParams * ), void * modDa
 }
 
 /* ****************** Mutex access if you want to change taskData directly ******************************
-you need to have kept a pointer to the taskData, or endFunc data, if you want to so this
+you need to have kept a pointer to the taskData, or endFunc data, if you want to do this
 
  *****************Gets the Mutex ****************************************
 Last Modified:

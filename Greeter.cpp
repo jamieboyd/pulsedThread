@@ -3,7 +3,6 @@
 #include <pulsedThread.h>
 #include "Greeter.h"
 
-
 /*************************************Initialization function*******************************************************
 This function initializes the custom data the thread will need. Previously, we made and filled a ptTestStruct
 structure initDataP and passed it to the pulsedThread construtor  (in main).
@@ -28,7 +27,6 @@ int ptTest_Init (void * initDataP, void * &taskDataP){
 	return 0;
 }
 
-
 /****************************************High and Low functions*********************************************************/
 void ptTest_Hi (void * taskData){
 // cast task data to our custom struct
@@ -40,7 +38,6 @@ void ptTest_Hi (void * taskData){
 		printf ("Hello again for the %dth time from %s\n",  ourData->times + 1, ourData->name);
 	}
 }
-
 
 void ptTest_Lo (void * taskDataP){
 	// cast task data to our custom struct
@@ -54,7 +51,6 @@ void ptTest_Lo (void * taskDataP){
 	// only for the low, increment times
 	ourData->times +=1;
 }
-
 
 // makes a pulsedThread to say hello and goodbye.
 int main(int argc, char **argv){

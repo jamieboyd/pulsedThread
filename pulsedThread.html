@@ -193,7 +193,7 @@ The frequency/dutycycle/train duration modification functions are:
 	<dt>int modDutyCycle (float newDutyCycle)</dt>
 	<dd>Changes the duty cycle of the train, keeping the frequency and the train length constant.</dd>
 </dl>
-As can be seen, changing one of the integer parameters will change several of the floating point parameters, and changing one of the floating point parameters will change several of the integer parameters. After each modification of timing parameters, one of the ticks2Times or times2Ticks utility functions is called as appropriate to update the other set of parameters. The pulsedThread class has functions for getting the timing parameters, in both formats:
+As can be seen, changing one of the integer parameters can change several of the floating point parameters, and changing one of the floating point parameters can change several of the integer parameters. After each modification of timing parameters, one of the ticks2Times or times2Ticks utility functions is called as appropriate to update the other set of parameters. The pulsedThread class has functions for getting the timing parameters, in both formats:
 <dl>
 	<dt>unsigned int getNpulses (void)</dt>
 	<dd>returns 0 for an infinite train, the number of pulses in a finite train, or 1 for a single pulse</dd>

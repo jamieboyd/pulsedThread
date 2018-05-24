@@ -465,27 +465,35 @@ int pulsedThread::isBusy(){
 	return taskNum;
 }
 
+
 /* *****************************************************************************************************
 waits until a thread is no longer doing a task, then returns
 Last modified:
+2018/05/23 by Jamie Boyd - changed timing from simple loop of nSleep to calculating end time and using timercmp
 2016/12/09 by Jamie Boyd - added paramater for timeout, and added return value for timed out vs not busy */
 int pulsedThread::waitOnBusy(float waitSecs){
+	// make timers, one for current time and one for current time + wait seconds
+	struct timeval currentTime;
+	struct timeval endTime;
+	struct timeval waitTime;
+	configureTimer ((waitSecs * 1E06), &waitTime);
+	gettimeofday (&endTime, NULL);
+	timeradd (&endTime, &waitTime, &endTime);
+	// make a timSpec sleeper for sleepTurnaround, typically 200 mSec
 	struct timespec Sleeper;
-	configureSleeper (1.01 * kSLEEPTURNAROUND, &Sleeper);
-	unsigned int nWait = (waitSecs * 1e06)/(1.01 * kSLEEPTURNAROUND);
+	configureSleeper (kSLEEPTURNAROUND, &Sleeper);
+	// check if tasks are done, sleep, check if time is up, repeat
 	int taskNum;
-	pthread_mutex_lock (&theTask.taskMutex);
-	taskNum = theTask.doTask;
-	pthread_mutex_unlock( &theTask.taskMutex);
-	for (unsigned int ii =0; ii < nWait ; ii+=1){
-		nanosleep (&Sleeper, NULL);
+	do{
 		pthread_mutex_lock (&theTask.taskMutex);
 		taskNum = theTask.doTask;
 		pthread_mutex_unlock( &theTask.taskMutex);
-		if (taskNum == 0){
+		if (taskNum ==0){
 			break;
 		}
-	}
+		nanosleep (&Sleeper, NULL);
+		gettimeofday (&currentTime, NULL);
+	}while (timercmp (&currentTime, &endTime, <));
 	return taskNum;
 }
 

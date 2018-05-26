@@ -217,14 +217,7 @@ inline int times2Ticks (float frequency, float dutyCycle, float trainDuration, t
 	unsigned int newDelay= round (pulseMicrosecs * (1 - dutyCycle));
 	unsigned int newDur = round (pulseMicrosecs * dutyCycle);
 	unsigned int newnPulses = round ((trainDuration * 1e06) / pulseMicrosecs);
-	/*
-	if (((theTask.nPulses == kINFINITETRAIN) && (newnPulses != kINFINITETRAIN)) && (theTask.doTask & 1)){
-#if beVerbose
-		printf ("times2Ticks error, infinite train with task not stopped: current length = %d and new length = %d\n", theTask.nPulses, newnPulses);
-#endif
-		return 1;
-	}
-	*/
+
 	theTask.pulseDelayUsecs = newDelay;
 	theTask.pulseDurUsecs =  newDur;
 	theTask.nPulses = newnPulses;

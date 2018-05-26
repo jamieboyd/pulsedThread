@@ -22,6 +22,7 @@
 		<li><a href = "#Constructors">Constructors</a></li>
 		<li><a href = "#Running_A_Thread">Running Pulsed Thread Tasks</a></li>
 		<li><a href= "#Changing_Pulse_Timing">Changing Pulse Number and Timing</a></li>
+		<li><a href= "#Using_endFuncs">Using End Functions</a></li>
 	</ol>
 	</li>
 </ol>
@@ -208,17 +209,9 @@ As can be seen, changing one of the integer parameters can change several of the
 	<dd>returns train duty cycle (0 -1)</dd>
 </dl></p>
 
-<p>You can also change the hiFunc and loFunc functions by changing the function pointers stored in the taskParams structure:
-<dl>
-	<dt>setLowFunc (void (*loFunc)(void * volatile))</dt>
-	<dd>sets function to run for Lo events</dd>
-	<dt>setHighFunc (void (*hiFunc)(void * volatile))</dt>
-	<dd>sets function to run for Hi events</dd>
-</dl>
-The hiFunc and loFunc functions take a void pointer, which, when the functions are called, will be pointing to the customData initialized by the initFunc.</p>
 
-<h3>Using End-Functions</h3>
-<p>An end-function is another function you supply, like the hiFunc and loFunc functions. The end-Function is called only at the end of a task. This is most useful for a train where you want to change some aspect of the train at the end of each train, but not after every pulse in the train. The end function is passed a pointer to the entire taskParams structure, not just your custom data:
+<a name= "Using_endFuncs"><h3>Using End-Functions</h3></a>
+<p>An end-function, or endFunc, is another function you supply, like the hiFunc and loFunc functions. The end-Function is called only at the end of a task. This is most useful for a train where you want to change some aspect of the train at the end of each train, but not after every pulse in the train. The end function is passed a pointer to the entire taskParams structure, not just your custom data:
 <dl>
 	<dt>setEndFunc (void (*endFunc)(taskParams *))</dt>
 	<dd>Sets the endFunc pointer in taskParams structure to address of your function<dd>
@@ -227,6 +220,15 @@ The hiFunc and loFunc functions take a void pointer, which, when the functions a
 	<dt>hasEndFunc (void</dt>
 	<dd>returns 1 if an endFunc is currently installed, else 0 if endFunc pointer in taskData structure is NULL</dd>
 </dl></p>
+
+<p>You can also change the hiFunc and loFunc functions by changing the function pointers stored in the taskParams structure:
+<dl>
+	<dt>setLowFunc (void (*loFunc)(void * volatile))</dt>
+	<dd>sets function to run for Lo events</dd>
+	<dt>setHighFunc (void (*hiFunc)(void * volatile))</dt>
+	<dd>sets function to run for Hi events</dd>
+</dl>
+The hiFunc and loFunc functions take a void pointer, which, when the functions are called, will be pointing to the customData initialized by the initFunc.</p>
 
 
 <h3>Modifying Custom Data</h3>

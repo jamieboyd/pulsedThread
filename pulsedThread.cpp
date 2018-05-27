@@ -770,8 +770,8 @@ int pulsedThread::cosineDutyCycleArray  (float * arrayData, unsigned int arraySi
 /* ****************************************************************************************************
 Changes taskData with supplied callback function and pointer to data
 Last Modified:
-2016/12/07 by Jamie Boyd - first version
-2016/12/12 by Jamie Boyd - added option for locking vs non-locking version */
+2016/12/12 by Jamie Boyd - added option for locking vs non-locking version 
+2016/12/07 by Jamie Boyd - first version */
 int pulsedThread::modCustom (int (*modFunc)(void *, taskParams * ), void * modData, int isLocking){	
 	// if locking, we install callback function and data in the task, and request it to be run
 	if (isLocking){
@@ -872,18 +872,27 @@ void pulsedThread::setEndFuncDataDelFunc  (void (*delFunc)( void *)){
 /* ****************************************************************************************************
 Destructor waits for task to be free, then cancels it
 Last Modified:
+2018/05/26 by Jamie Boyd - waits for current pulse or train to finish
 2018/02/01 by Jamie Boyd - moved wait on busy so it only runs when needed. Also, nw aborts a train in progress after pulses is finished, or 100 seconds
 2017/11/29 by jamie Boyd - added call to function pointer, delCustomDataFunc, for deletion of customData
 2016/01/16 by Jamie Boyd - removed delete customData and modCustomData, as this should be deleted by maker of pulsed thread
 2015/09/29 by Jamie Boyd - initial version */
 pulsedThread::~pulsedThread(){
 	// stop the task
-	if (theTask.doTask){
-		pthread_mutex_lock (&theTask.taskMutex);
-		theTask.doTask =0;
-		pthread_cond_signal(&theTask.taskVar);
-		pthread_mutex_unlock( &theTask.taskMutex);
-		//this->waitOnBusy(100); // should be long enough to finish last pulse
+	if (theTask.nPulses == kINFINITETRAIN){
+		if (theTask.doTask & 1){
+			pthread_mutex_lock (&theTask.taskMutex);
+			theTask.doTask =0;
+			pthread_cond_signal(&theTask.taskVar);
+			pthread_mutex_unlock( &theTask.taskMutex);
+		}	
+	}else{
+		if (theTask.doTask > 1) { // no need to do anything unless 1 or more tasks still left to do
+			pthread_mutex_lock (&theTask.taskMutex);
+			theTask.doTask =1;
+			pthread_cond_signal(&theTask.taskVar);
+			pthread_mutex_unlock( &theTask.taskMutex);
+		}
 	}
 	pthread_mutex_lock (&theTask.taskMutex);
 	pthread_cancel(theTask.taskThread);

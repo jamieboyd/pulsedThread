@@ -529,54 +529,56 @@ Thread is done printing and so am I
 </pre>
 
 <a name= "Python_C_Module"><h2>Using pulsedThread in a Python/C Module</h2></a>
-<p>To use the pulsedThread C++ library in a Python module, you can start with the wrapper functions provided in the file pyPulsedThread.h. These functions are designed to work with a pulsedThread object on the C++ side of things and a PyCapsule object containing a pointer to that pulsedThread object on the Python side of things. For general information on writing Python/C modules, see the <a href="https://docs.python.org/3.4/c-api/index.html">Python/C API Reference Manual</a></p>
+<p>To use the pulsedThread C++ library in a Python module, you can start with the wrapper functions provided in the file pyPulsedThread.h.  These functions are designed to work with a pulsedThread object on the C++ side of things and a PyCapsule object containing a pointer to that pulsedThread object on the Python side of things. For general information on writing Python/C modules, see the <a href="https://docs.python.org/3.4/c-api/index.html">Python/C API Reference Manual</a></p>
 
-<p>As when using pulsedThread directly from C++, you must supply at minimum the C++ functions for initialization of the taskCustom data, and HI and LO event functions. You must also supply a Python/C module function that makes a new pulsedThread using your initialization and HI and LO functions. This function must return to Python a PyCapsule that wraps a pointer to your pulsedThread object. From Python, you pass that PyCapsule as a parameter to functions from pyPulsedThread.h that interact with the pulsedThread object, asking it to do tasks and configure pulse/train timing.>/p>
+<p>As when using pulsedThread directly from C++, you must supply at minimum the C++ functions for initialization of the taskCustom data, and HI and LO event functions. Your initialization function must return a PyCapsule containing a pointer to a pulsedThread object.  The functions in pyPulsedThread.h can then interact with the PyCapsule object asking it to do tasks and configure pulse/train timing.  You must also supply a Python/C module function that makes a new pulsedThread using your initialization and HI and LO functions. Other modules that wish to include pyPulsedThread.h need to provide an initialization function that returns a PyCapsule containing a pointer to a pulsedThread object. The functions in pyPulsedThread can then interact with the PyCapsule object asking it to do tasks and configure pulse/train timing. This function must return to Python a PyCapsule that wraps a pointer to your pulsedThread object. From Python, you pass that PyCapsule as a parameter to functions from pyPulsedThread.h that interact with the pulsedThread object, asking it to do tasks and configure pulse/train timing.</p>
+
 
 <p>Wrappers for almost all of the pulsedThread library control functions and setters and getters are provided. They are called from Python as follows:
 <dl>
 <dt>isBusy (PyCapsule pulsedThreadPtr)</dt>
-<dl>Returns number of tasks a pthread has left to do, 0 means finished all tasks</dl>
+<dd>Returns number of tasks a pthread has left to do, 0 means finished all tasks</dd>
 <dt>waitOnBusy (PyCapsule pulsedThreadPtr, float timeOut) </dt>
 <dd>Returns when a pthread is no longer busy, or after timeOut secs</dd>
 <dt>doTask (PyCapsule pulsedThreadPtr)</dt>
 <dd>Tells the pulsedThread object to do whatever pulse or train it was configured for</dd>
+<dt>doTasks (PyCapsule pulsedThreadPtr, int numTasks)</dt>
+<dd>Tells the pulsedThread object to do whatever pulse or train it was configured for numTasks times without stopping in between.</dd>
+<dt>startTrain (PyCapsule pulsedThreadPtr)</dt>
+<dd>Tells a pulsedThread object configured as an infinite train to start</dd>
+<dd>stopTrain (PyCapsule pulsedThreadPtr)</dd>
+<dt>Tells a pulsedThread object configured as an infinite train to stop</dt>
+<dt>modDelay (PyCapsule pulsedThreadPtr, int delay)</dt>
+<dd>sets the delay period of a pulse or LOW period of a train</dd>
+<dt>modDur (PyCapsule pulsedThreadPtr, int delay)</dt>
+<dd>changes the duration period of a pulse or HIGH period of a train</dd>
+<dt>modTrainLength (PyCapsule pulsedThreadPtr, int length)</dt>
+<dd>changes the number of pulses of a train</dd>
+<dt>modTrainDur (PyCapsule pulsedThreadPtr, float time)</dt>
+<dd>changes the total time duration of a train bychanging number of pulses</dd>
+<dt>modTrainFreq (PyCapsule pulsedThreadPtr, float freq)</dt>
+<dd>changes the frequency of a train preserving duty cycle and time duration</dd>
+<dt>modTrainDuty (PyCapsule pulsedThreadPtr, float duty)</dt>
+<dd>changes the duty cycle of a train</dd>
+<dt>getPulseDelay (PyCapsule pulsedThreadPtr)</dt>
+<dd>returns pulse delay, LO time of a train, in seconds</dd>
+<dt>getPulseDuration (PyCapsule pulsedThreadPtr)</dt>
+<dd>returns pulse duration, HI time of a train, in seconds</dd>
+<dt>getPulseNumber (PyCapsule pulsedThreadPtr)</dt>
+<dd>returns number of pulses in a train, 1 for a single pulse, or 0 for an infinite train</dd>
+<dt>getTrainDuration (PyCapsule pulsedThreadPtr)</dt>
+<dd>returns time duration of a train, in seconds</dd>
+<dt>getTrainFrequency (PyCapsule pulsedThreadPtr)</dt>
+<dd>returns frequency of a train, in Hz</dd>
+<dt>getTrainDutyCycle (PyCapsule pulsedThreadPtr)</dt>
+<dd>returns duty cycle of a train, ratio of HI time to (HI + LO time),between 0 and 1</dd>
+<dt>unsetEndFunc (PyCapsule pulsedThreadPtr)</dt>
+<dd>un-sets any end function set for this pulsed thread. Each module must provide its own function for setting an end function.</dd>
+<dt>hasEndFunc (PyCapsule pulsedThreadPtr)</dt>
+<dd>Returns the endFunc status (1=installed or 0=not installed) for a pulsed thread</dd>
+</dl>
 
-doTasks (PyCapsule pulsedThreadPtr, int numTasks) - Tells the pulsedThread object to do whatever pulse or train it was configured for numTasks times without stopping in between.
-
-startTrain (PyCapsule pulsedThreadPtr) - Tells a pulsedThread object configured as an infinite train to start
-
-stopTrain (PyCapsule pulsedThreadPtr) - Tells a pulsedThread object configured as an infinite train to stop
-
-modDelay (PyCapsule pulsedThreadPtr, int delay) - sets the delay period of a pulse or LOW period of a train
-
-modDur (PyCapsule pulsedThreadPtr, int delay) - changes the duration period of a pulse or HIGH period of a train
-
-modTrainLength (PyCapsule pulsedThreadPtr, int length) - changes the number of pulses of a train
-
-modTrainDur (PyCapsule pulsedThreadPtr, float time) - changes the total time duration of a train bychanging number of pulses
-
-modTrainFreq (PyCapsule pulsedThreadPtr, float freq) - changes the frequency of a train preserving duty cycle and time duration
-
-modTrainDuty (PyCapsule pulsedThreadPtr, float duty) - changes the duty cycle of a train
-
-getPulseDelay (PyCapsule pulsedThreadPtr) - returns pulse delay, LO time of a train, in seconds
-
-getPulseDuration (PyCapsule pulsedThreadPtr) - returns pulse duration, HI time of a train, in seconds
-
-getPulseNumber (PyCapsule pulsedThreadPtr) - returns number of pulses in a train, 1 for a single pulse, or 0 for an infinite train
-
-getTrainDuration (PyCapsule pulsedThreadPtr) - returns time duration of a train, in seconds
-
-getTrainFrequency (PyCapsule pulsedThreadPtr) - returns frequency of a train, in Hz
-
-getTrainDutyCycle (PyCapsule pulsedThreadPtr) - returns duty cycle of a train, ratio of HI time to (HI + LO time),between 0 and 1
-
-unsetEndFunc (PyCapsule pulsedThreadPtr) - un-sets any end function set for this pulsed thread. Each module must provide its own function for setting an end function.
-
-hasEndFunc (PyCapsule pulsedThreadPtr) Returns the endFunc status (1=installed or 0=not installed) for a pulsed thread
-
-11) Sample Python C++ Module Example
+<h2>11) Sample Python C++ Module Example</h2>
 
 The file pyGreeter.cpp makes a simple Python C++ module using pyPulsedThread.h. pyGreeter.cpp provides a single function that makes a pulsedThread object and returns a pyCapsule containing a pointer to it.
 

@@ -54,7 +54,11 @@ Make sure to run make install before running make greeter or make minimalGreeter
 	</ol>
 	
 	
-	<li><a href = "#Python_C_Module">Using pulsedThread in a Python C++ Module</a></li>
+	<li>Using pulsedThread in a Python C++ Module
+		<ol>
+		<li><a href= "#Python_Wrappers">Python Wrappers</a></li>
+		</ol>
+	</li>
 	
 </ol>
 
@@ -587,7 +591,7 @@ Thread is done printing and so am I
 </pre>
 
 <a name = "GPIO_App"><h3>End-Function Application Example with GPIO</h3></a>
-<p>Here is a simple application using SimpleGPIO_thread, a sub-class of the pulsedThread class that makes pulses and trains of pulses on a GPIO pin. This program runs an infinite train at 1 kHz. At the end of each pulse, the end-function that changes duty cycle is called. A 100 point array containing a cosine scaled from 0 to 1 provides the dudy cycles.
+<p>Here is a simple application from the <a href= "https://github.com/jamieboyd/GPIO_Thread">GPIO_Thread</a> project using SimpleGPIO_thread, a sub-class of the pulsedThread class that makes pulses and trains of pulses on a GPIO pin. This program runs an infinite train at 1 kHz. At the end of each pulse, the end-function that changes duty cycle is called. A 100 point array containing a cosine scaled from 0 to 1 provides the dudy cycles. After 20 seconds, we change the part of the array that the endFunc iterates over to just the middle part of the array, centered over the peak of the cosine wave.
 <pre>
 #include "SimpleGPIO_thread.h"
 #include <stdio.h>
@@ -617,7 +621,7 @@ int main(int argc, char **argv){
 	// let it run for 20 seconds
 	myGPIO->waitOnBusy (20);
 	// change the part of the array that the endFunc iterates over to the middle part of the array
-	int result = myGPIO->setEndFuncArrayLimits (24, 75, 1);
+	int result = myGPIO->setEndFuncArrayLimits (25, 75, 1);
 		if (result){
 		printf ("setEndFuncArrayLimits reported an error. Now exiting...\n");
 		return 1;
@@ -632,15 +636,19 @@ int main(int argc, char **argv){
 	delete (endFuncArrayData);
 	return 0;
 }
-</pre>
- Run the output of the GPIO pin through an oscilloscope to see the duty cycle change from 0 to 1 and back to 0 10 times a second. Run the output through a low pass filter first to see a fairly clean cosine wave with a frequency of 10 Hz</p>
+</pre></p>
+<p>Run the output of the GPIO pin through an oscilloscope to see the duty cycle change from 0 to 1 and back to 0 10 times a second. Run the output through a low pass filter first to see a fairly clean cosine wave with a frequency of 10 Hz.</p>
+<IMG SRC="CosineFromPWM.png" ALT="Cosine from software PWM">
 
+<p>The exposure of this cell phone camera image was long enough to fortuitously capture the changeover from outputting the full array to cycling through a restricted subset of the array; the full range and partial range outputs are superimposed. Only iterating over the half the points, the frequency of the wave is doubled.</p>
+<IMG SRC="cosineRangeChange.png" ALT="cosine RangeChange">
+	
 <h2>About the Pthread</h2>
-<p>For those wanting a better understanding of how pulsedThread works behind the scenes, a description of the functions and data used by the Pthread are presented here. The pulsedThread constructors create a new Pthread and start it running pulsedThreadFunc with a pointer to a taskParams Structure, theTask:<br>
-pthread_create(&theTask.taskThread, NULL, &pulsedThreadFunc, (void *)&theTask);<br>
+<p>For those wanting a better understanding of how pulsedThread works behind the scenes, a description of the functions and data used by the Pthread are presented here. The pulsedThread constructors create a new Pthread and start it running pulsedThreadFunc with a pointer to a <a href= "#taskParams_Struct">taskParams Structure</a>, theTask:<br>
+pthread_create(&amp;theTask.taskThread, NULL, &amp;pulsedThreadFunc, (void *)&amp;theTask);<br>
 The constructors also initialize a mutex and a condition variable used for signaling between the pulsedThread object and the Pthread running pulsedThreadFunc, and save pointers to these in thetask:<br>
-pthread_mutex_init(&theTask.taskMutex, NULL);<br>
-pthread_cond_init (&theTask.taskVar, NULL);<br>
+pthread_mutex_init(&amp;theTask.taskMutex, NULL);<br>
+pthread_cond_init (&amp;theTask.taskVar, NULL);<br>
 </p>
 
 <h2><a name= "pulsedThreadFunc">pulsedThreadFunc function run by Pthread</a></h2>
@@ -656,9 +664,9 @@ taskParams *theTask = (taskParams *) tData;</p>
 // loop forever, doing task and modding task
 for (;;){
 	// get the lock on doTask and wait for a task to be called, or a timing or customMod param to be modded
-	pthread_mutex_lock (&theTask->taskMutex);
+	pthread_mutex_lock (&amp;theTask->taskMutex);
 	while (theTask->doTask==0)
-		pthread_cond_wait(&theTask->taskVar, &theTask->taskMutex);
+		pthread_cond_wait(&amp;theTask->taskVar, &amp;theTask->taskMutex);
 </pre>
 Using the Pthreads library function pthread_cond_wait, the execution of pulsedThreadFunc is stalled until theTask->doTask is modified from outside the Pthread by the pulsedThread object. Setting doTask to the number of pulses or trains requested is how a pulsedThread object requests the Pthread to start a pulse or a train. Note that the higher order bits of doTask are used to signal pulsedThreadFunc to change timing paramaters or custom data. You can have many pulsedThread objects extant at once, but they only use processor time when they are actively doing a task.</p>
 
@@ -766,16 +774,15 @@ modCustomData is pointer to the data to be used by a modCustomFunc to modify the
 <h4>pthread_t taskThread, pthread_mutex_t taskMutex, and pthread_cond_t taskVar</h4>
 These are data structures provided by pthread.h. taskThread is a pthread structure, initialized when the pthread is created, and freed in the pulsedThread destructor. taskMutex is a mutex that is used in the lock and unlock operations to prevent simultaneous writing by the pthread and the pulsedThread object to doTask or perhaps taskData or endFuncData.  taskVar is a conditon variable used to signal from a pulsedThread object to the associate pthread that doTask has been modified and there is work to do.  The pthread uses the pthread_cond_wait function to sleep until a task has been called, then does the task(s)and sleeps again.
 
+<h2>Using pulsedThread in a Python/C Module</h2>
+<p>A Python/C module uses normal C or C++ code, such as that described in pulsedThread.h, plus the special C functions defined in Python.h that can interact with Python objects and provide the means for Python functions to call C and C++ code.  For general information on writing Python/C modules, see the <a href="https://docs.python.org/3.4/c-api/index.html">Python/C API Reference Manual</a>.  A Python/C module provides Python functions that behave like normal Python functions but call directly into and receive results from custom C/C++ code.  The file pyPulsedThread.h. includes both pulsedThread.h and Python.h and provides functions for a Python interface to the pulsedThread C++ library.</p>
 
+<p> The functions in pyPulsedThread.h are designed to work with a pulsedThread object on the C++ side of things and a PyCapsule containing a pointer to that pulsedThread object on the Python side of things. A Capsule is a Python data type which stores a pointer (void *). Capsules can only be created and accessed via their C API, but they can be passed around like any other Python object.</p>
 
+<p>When writing a Python/C module using pulsedThread, as when using the pulsedThread library directly from C++, the programmer supplies C++ functions for initialization of the taskCustom data, and the HI and LO event functions.  The hiFunc and loFunc and optional endFunc are C functions, but can make callbacks into the Python environment.  Your C++ initialization function is called from Python, creates a pulsedThread object, and uses the PyCapsule_New function from the Python/C API to return a PyCapsule containing a pointer to that pulsedThread object back to Python.  The functions in pyPulsedThread.h can then interact with the PyCapsule object asking it to do tasks and configure pulse/train timing.  These functions are called from Python with the PyCapsule created earlier plus task and timing information.  The functions in pyPulsedThread.h parse their Python-derived arguments into C/C++ data and object references and, in turn, call methods from pulsedThread.  The functions in pyPulsedThread.h thus provide Python wrappers for the pulsedThread class.</p>
 
-<a name= "Python_C_Module"><h2>Using pulsedThread in a Python/C Module</h2></a>
-<p>To use the pulsedThread C++ library in a Python module, you can start with the wrapper functions provided in the file pyPulsedThread.h.  These functions are designed to work with a pulsedThread object on the C++ side of things and a PyCapsule object containing a pointer to that pulsedThread object on the Python side of things. For general information on writing Python/C modules, see the <a href="https://docs.python.org/3.4/c-api/index.html">Python/C API Reference Manual</a></p>
-
-<p>As when using pulsedThread directly from C++, you must supply at minimum the C++ functions for initialization of the taskCustom data, and HI and LO event functions. Your initialization function must return a PyCapsule containing a pointer to a pulsedThread object.  The functions in pyPulsedThread.h can then interact with the PyCapsule object asking it to do tasks and configure pulse/train timing.  You must also supply a Python/C module function that makes a new pulsedThread using your initialization and HI and LO functions. Other modules that wish to include pyPulsedThread.h need to provide an initialization function that returns a PyCapsule containing a pointer to a pulsedThread object. The functions in pyPulsedThread can then interact with the PyCapsule object asking it to do tasks and configure pulse/train timing. This function must return to Python a PyCapsule that wraps a pointer to your pulsedThread object. From Python, you pass that PyCapsule as a parameter to functions from pyPulsedThread.h that interact with the pulsedThread object, asking it to do tasks and configure pulse/train timing.</p>
-
-
-<p>Wrappers for almost all of the pulsedThread library control functions and setters and getters are provided. They are called from Python as follows:
+<a name= "Python_Wrappers"><h3>Python Wrappers</h3></a>
+<p>Wrappers for almost all of the pulsedThread library control functions and setters and getters are provided in pyPulsedThread.h.  To call them from a Python/C module, you need to supply a module method table, defining the Python names of the functions and the paramaters they accept.  You can use the one from pyGreeter.cpp as a guide, adding only yuor own initialization function.  The Python functions from pyPulsedThread.h, then, are called like this:
 <dl>
 <dt>isBusy (PyCapsule pulsedThreadPtr)</dt>
 <dd>Returns number of tasks a pthread has left to do, 0 means finished all tasks</dd>
@@ -785,10 +792,12 @@ These are data structures provided by pthread.h. taskThread is a pthread structu
 <dd>Tells the pulsedThread object to do whatever pulse or train it was configured for</dd>
 <dt>doTasks (PyCapsule pulsedThreadPtr, int numTasks)</dt>
 <dd>Tells the pulsedThread object to do whatever pulse or train it was configured for numTasks times without stopping in between.</dd>
+<dt>unDoTasks (PyCapsule pulsedThreadPtr)</dt>
+<dd>Tells the pulsedThread object to cancel doing requested tasks except for a task it might be in the middle of doing</dd>
 <dt>startTrain (PyCapsule pulsedThreadPtr)</dt>
 <dd>Tells a pulsedThread object configured as an infinite train to start</dd>
-<dd>stopTrain (PyCapsule pulsedThreadPtr)</dd>
-<dt>Tells a pulsedThread object configured as an infinite train to stop</dt>
+<dt>stopTrain (PyCapsule pulsedThreadPtr)</dt>
+<dd>Tells a pulsedThread object configured as an infinite train to stop</dd>
 <dt>modDelay (PyCapsule pulsedThreadPtr, int delay)</dt>
 <dd>sets the delay period of a pulse or LOW period of a train</dd>
 <dt>modDur (PyCapsule pulsedThreadPtr, int delay)</dt>
@@ -817,12 +826,54 @@ These are data structures provided by pthread.h. taskThread is a pthread structu
 <dd>un-sets any end function set for this pulsed thread. Each module must provide its own function for setting an end function.</dd>
 <dt>hasEndFunc (PyCapsule pulsedThreadPtr)</dt>
 <dd>Returns the endFunc status (1=installed or 0=not installed) for a pulsed thread</dd>
+<dt>setEndFuncObj (PyCapsule pulsedThreadPtr, PythonObj withEndFuncObj, int mode)</dt>
+<dd>sets the Python object withEndFuncObj to provide the endFunction for pulsedThread, getting timing information in pulse description mode or frequency mode</dd>
+<dt>setTaskFuncObj (PyCapsule pulsedThreadPtr, PythonObj withLoFuncHiFunc)</dt>
+<dd>sets the Python object withLoFuncHiFunc to provide the hiFunc and loFunc for the pulsedThread</dd>
+<dt>setArrayEndFunc (PyCapsule pulsedThreadPtr, array fpData, int endFuncType, int isLocking)</dt>
+<dd>sets pulsedThread endFunc to set frequency (type 0) or duty cycle (type 1) from the Python float array fpData</dd>
+<dt>cosDutyCycleArray (Python array fpData, int pointsPerCycle, float offset, float scaling)</dt>
+<dd>fills passed-in array with cosine values of given period, with applied scaling and offset expected to range between 0 and 1</dd>
 </dl>
 
-<h2>11) Sample Python C++ Module Example</h2>
-
-The file pyGreeter.cpp makes a simple Python C++ module using pyPulsedThread.h. pyGreeter.cpp provides a single function that makes a pulsedThread object and returns a pyCapsule containing a pointer to it.
-
+<a name = "pyGreeter"><h3>Sample Python C++ Module Example</h3></a>
+<p>The file pyGreeter.cpp makes a simple Python C++ module using pyPulsedThread.h. pyGreeter.cpp provides a single function that makes a pulsedThread object and returns a pyCapsule containing a pointer to it:
+<pre>
+#include <pyPulsedThread.h>
+#include "Greeter.h"
+/******************************C++ Code that is called from Python - forming the interface to the Python Module*****************
+This is where you put functions to create and interact with the C++ pulsedThread object, and also use function from Python.h to 
+create, return to Python, and interact with Python objects. All we need to do is create a pulsedThread and  we can
+use the function in pyPulsedThread.h to run it */
+/* makes a pulsedThread object and returns to Python a pyCapsule containing a pointer to the pulsedThread*/
+static PyObject* pulsed_C_Greeter (PyObject *self, PyObject *args) {
+	// parameters passed to this function from Python are a string for the name, and integer for timing mode
+	const char * localName;
+	int accLevel;
+	// parse the arguments and copy into local variables
+	if (!PyArg_ParseTuple(args,"is",  &amp;accLevel, &amp;localName)) {
+		PyErr_SetString (PyExc_RuntimeError, "Could not parse arguments for timing mode and name string.");
+		return NULL;
+	}
+	// make a ptTestStruct to use for iniitialization, with name from Python 
+	ptTestStruct initStruct;
+	int iPos;
+	for (iPos=0; iPos &lt; 255 &amp;&amp; localName[iPos] != 0; iPos+=1){
+		initStruct.name[iPos] = localName[iPos] ;
+	}
+	initStruct.name[iPos] =0;
+	
+	// make a pulsed thread with our pttestStruct and our Hi and Lo functions. Use microsecond delay, microsecond duration, and number of pulses method
+	int errCode =0;
+	pulsedThread * threadObj = new pulsedThread ((unsigned int)50000, (unsigned int)50000, (unsigned int)10, (void *) &amp;initStruct, &amp;ptTest_Init, &amp;ptTest_Lo, &amp;ptTest_Hi, accLevel, errCode);
+	if (errCode){
+		PyErr_SetString (PyExc_RuntimeError, "Could not make a new pulsedThread object.");
+		return NULL;
+	}else{
+		return PyCapsule_New (static_cast <void *>(threadObj), "pulsedThread", pulsedThread_del);
+	}
+  }
+</pre>
 pulsed_C_Greeter (PyObject *self, PyObject *args);
 The parameters passed to this function from Python are a string for a name, and an integer for timing mode. The C module interface passes them to C++ as a pointer to a python object, PyObject *args, and the C module interface function PyArg_ParseTuple is used to parse it into a string and an integer.
 

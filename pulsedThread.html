@@ -5,11 +5,11 @@
 <META NAME="AUTHOR" CONTENT="Jamie Boyd">
 </head>
 <H1>Documentation for pulsedThread</H1>
-<p>PulsedThread uses the <a href = "http://pubs.opengroup.org/onlinepubs/7908799/xsh/pthread.h.html">POSIX pthread library</a> to set up and control a threaded task for precise, independent timing of events that can be categorized as pulses or trains of pulses. PulsedThread uses a mix of C++ class methods and C-style functions and structures to use the pthread C library with the convenience of C++ classes. For C++ programmers, the pulsedThread class methods wrap up all the pthread calls so that use of the pulsedThread class  from your own C++ code requires no knowledge of the pthread library, and only limited knowledge of the C-style structures and functions used by pulsedThread. You will need to know C-style function references and void pointers.</p>
+<p>PulsedThread uses the <a href = "http://pubs.opengroup.org/onlinepubs/7908799/xsh/pthread.h.html">POSIX pthread library</a> to set up and control a threaded task for precise, independent timing of events that can be categorized as pulses or trains of pulses. PulsedThread uses a mix of C++ class methods and C-style functions and structures to use the pthread C library with the convenience of C++ classes. For C++ programmers, the pulsedThread class methods wrap up all the pthread calls so that use of the pulsedThread class from your own C++ code requires no knowledge of the pthread library, and only limited knowledge of the C-style structures and functions used by pulsedThread. You will need to know C-style function references and void pointers.</p>
 
-</p>Under the hood, a pulsedThread object uses Pthread library functions to start and control a separate thread, running <b><a href= "#pulsedThreadFunc">pulsedThreadFunc</a></b>. The Pthread running pulsedThreadFunc controls all of the pulse timing, and calls user-supplied functions with user-supplied data at the starts of the high and low periods of each pulse.  Each pulsedThread object has a <B><a href= "#taskParams_Struct">taskParams structure </a></b>that both it and its associated pthread can access, containing pointers to the user-supplied functions and data and pulse timing information. The pulsedThread object communicates with its associated pthread through this taskParams structure: configuring pulse timing and number; telling the pthread to do pulses or trains; perhaps getting results back from the pthread.</p> 
+</p>Under the hood, a pulsedThread object uses Pthread library functions to start and control a separate thread, running <a href= "#pulsedThreadFunc"><b>pulsedThreadFunc</b></a>. The Pthread running pulsedThreadFunc controls all of the pulse timing, and calls user-supplied functions with user-supplied data at the starts of the high and low periods of each pulse.  Each pulsedThread object has a <a href= "#taskParams_Struct"><b>taskParams structure</b></a> that both it and its associated pthread can access, containing function references to the user-supplied functions and data and pulse timing information. The pulsedThread object communicates with its associated Pthread through this taskParams structure: configuring pulse timing and number; telling the pthread to do pulses or trains; perhaps getting results back from the pthread.</p> 
 
-<p>The PulsedThread project also contains code for making <a href = "https://docs.python.org/3.5/extending/building.html">Python C-modules</a> that can create and control pulsedThread objects from Python.  Some simple examples making Python C-modules using pulsedThread are included.</p>
+<p>The PulsedThread project also contains code for making <a href = "https://docs.python.org/3.5/extending/building.html"><b>Python C-modules</b></a> that can create and control pulsedThread objects from Python. Some simple examples making Python C-modules using pulsedThread are included.</p>
 
 <p>PulsedThread was originally written to control Raspberry Pi GPIO hardware. The <a href= "https://github.com/jamieboyd/GPIO_Thread">GPIO_Thread</a> project uses the pulsedThread project to make C++ classes and Python C-modules that output independently timed pulses or trains of pulses on standard GPIO pins, including running a 2-phase stepper motor, and to output wave forms or control a servo-motor using the PWM peripheral.</p>
 
@@ -39,15 +39,17 @@ Make sure to run make install before running make greeter or make minimalGreeter
 		<li><a href= "#Changing_Pulse_Timing">Changing Pulse Number and Timing</a></li>
 		<li><a href= "#Using_endFuncs">Using End Functions</a></li>
 		<li><a href= "#Modifying_Custom_Data">Modifying Custom Data</a></li>
+		<li><a href="#Array_EndFuncs">Special Support for endFuncs that Iterate through an Array</a></li>
 	</ol>
 	</li>
 	<li><a href="#Minimal_Application">A Minimal Application Example</a></li>
 	<li><a href = "#Minimaller_App">An Even More Minimal Application Example</a></li>
-	<li><a href="#Array_EndFuncs">Special Support for endFuncs that Iterate through an Array</a></li>
-	<li>Non-Class Structures and Functions</li>
+	<li><a href = "#GPIO_App">End-Function Application Example with GPIO</a></li>
+	
+	<li>About the Pthread</li>
 	<ol>
-		<li><a href= "#taskParams_Struct">the taskParams structure</a></li>
 		<li><a href= "#pulsedThreadFunc">pulsedThreadFunc function</a></li>
+		<li><a href= "#taskParams_Struct">the taskParams structure</a></li>
 		<li><a href = "#Timing_Utilities">Timing Utilities</a></li>
 	</ol>
 	
@@ -289,13 +291,61 @@ Note that unSetEndFunc loses the reference to endFunc; there is no corresponding
 <dd></dd>
 </dl>
 
-<p>You can also change the hiFunc and loFunc functions by changing the function pointers stored in the taskParams structure:
+<p>You can also change the hiFunc and loFunc functions by changing the function pointers stored in the taskParams structure using the following methods:
 <dl>
 	<dt>setLowFunc (void (*loFunc)(void * volatile))</dt>
 	<dd>sets function to run for Lo events</dd>
 	<dt>setHighFunc (void (*hiFunc)(void * volatile))</dt>
 	<dd>sets function to run for Hi events</dd>
 </dl>
+
+<a name = "Array_EndFuncs"><h3>Special Support for endFuncs that Iterate through an Array</h3></a>
+<p>Two endFuncs are provided that change either or frequency or duty cycle by cycling through an array of floating point values. because this is a common use of an end function, support for changing frequency and duty cycle is built right into the pulsedThread class. Both endFuncs are designed to work with the same custom struct, provided in pulsedThread.h:</p>
+<pre>
+/* ******************* A Custom struct for endFunc Data using an array **************************
+for the two provided endFuncs that change frequency and dutyCycle for trains */
+typedef struct pulsedThreadArrayStruct{
+	float * arrayData;		// pointer to an array of floats
+	unsigned int startPos; 		// where to start in the array when out putting data
+	unsigned int endPos;		// where to end in the array
+	unsigned int arrayPos;		// current position in array, as it is iterated through
+}pulsedThreadArrayStruct, *pulsedThreadArrayStructPtr;
+</pre>
+
+<p>The two endFuncs are:<br>
+void pulsedThreadFreqFromArrayEndFunc (void * endFuncData, taskParams * theTask);<br>
+void pulsedThreadDutyCycleFromArrayEndFunc (void * endFuncData, taskParams * theTask);<br>
+The first sets thread frequency, and the second sets thread duty cycle. The endfuncs
+<ol>
+	<li>cast endFunc data pointer to pulsedThreadArrayStructPtr</li>
+	<li>move arrayPos to next point in array and wrap position to start if needed</li>
+	<li>use times2Ticks or ticks2Times utility functions to update taskParams with new timing values calculated from array value for frequency or duty cycle</li>
+	<li>set high order signal bits of doTask to signal thread that pulse duration and delay have changed</li>
+</ol></p>
+
+<p>The arrayData is provided by the user. A callback designed to be used with pulsedThread::modCustom, pulsedThreadSetUpArrayCallback, can be used to copy a pointer to the user's arrayData to the arrayData pointer in the pulsedThreadArrayStruct. <br>
+int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask);<br>
+The modData is a pulsedThreadArrayStruct, same  as is used by the endFunc itself. pulsedThreadSetUpArrayCallback does the following:
+<ol>
+	<li>cast modData to a pulsedThreadArrayStructPtr</li>
+	<li>make a new pulsedThreadArrayStruct , and point endFuncDataPtr at it</li>
+	<li>copy over the data from modData, Don't copy array data, just a pointer to the array.</li>
+	<li>delete modData</li>
+</ol>
+Note that the arrayData array itself is not copied, so the user must take care to keep the arrayData from being deleted. The startPos, endPos, and arrayPos are copied into new pulsedThreadArrayStruct. A class method is available that calls modCustom for you. This and other class methods for dealing with array endFuncs are:
+<dl>
+	<dt>int setUpEndFuncArray (float * newData, unsigned int nData, int isLocking)</dt>
+	<dd>sets up a new pulsedThreadArrayStruct as endFunc data to cycle through the provided array of floats</dd>
+	<dt>void chooseArrayEndFunc (int endFuncMode)</dt>
+	<dd>sets an endFunc to cycle through an array. endFuncMode is 0 for frequency from array, 1 for dutyCycle from array</dd>
+	<dt>int setEndFuncArrayLimits (unsigned int startPosP, unsigned int endPosP, int isLocking)</dt>
+	<dd>sets starting and ending position within the array, so you can cycle through a subset of the array</dd>
+	<dt>int setEndFuncArrayPos (unsigned int arrayPosP, int isLocking)</dt>
+	<dd>sets current position within the array, so you can jump immediately to a different part of the array and continue iterating from there</dd>
+	<dt>static int cosineDutyCycleArray  (float * arrayData, unsigned int arraySize, unsigned int period, float offset, float scaling)</dt>
+	<dd>Utility function to fill a passed-in array with a cosine</dd>
+</dl>
+
 
 <a name="Minimal_Application"><h2>A Minimal Application Example</h2></a>
 <p>The file Greeter.cpp contains code for a small test application that demonstrates making and using a pulsedThread object with hiFunc and lowFunc that simply print some information. Aside from main, Greeter.cpp contains the HI, LO, and INIT functions, and the definition of a structure to hold the custom data:</p>
@@ -536,57 +586,90 @@ Value of busy-work variable calculated to be 13089607352644.375000000000
 Thread is done printing and so am I
 </pre>
 
-<a name = "Array_EndFuncs"><h2>Special Support for endFuncs that Iterate through an Array</h2></a>
-<p>Two endFuncs are provided that change frequency or dutyCycle by cycling through an array of floating point values.  Both endFuncs are designed to work with the same custom struct:</p>
+<a name = "GPIO_App"><h3>End-Function Application Example with GPIO</h3></a>
+<p>Here is a simple application using SimpleGPIO_thread, a sub-class of the pulsedThread class that makes pulses and trains of pulses on a GPIO pin. This program runs an infinite train at 1 kHz. At the end of each pulse, the end-function that changes duty cycle is called. A 100 point array containing a cosine scaled from 0 to 1 provides the dudy cycles.
 <pre>
-/* ******************* A Custom struct for endFunc Data using an array **************************
-for the two provided endFuncs that change frequency and dutyCycle for trains */
-typedef struct pulsedThreadArrayStruct{
-	float * arrayData;		// pointer to an array of floats
-	unsigned int startPos; 		// where to start in the array when out putting data
-	unsigned int endPos;		// where to end in the array
-	unsigned int arrayPos;		// current position in array, as it is iterated through
-}pulsedThreadArrayStruct, *pulsedThreadArrayStructPtr;
+#include "SimpleGPIO_thread.h"
+#include <stdio.h>
+
+/* ******************************** makes a GPIO output that does software pulse width modulation *********************************************/
+static const int GPIO_PIN = 19;
+static const int POLARITY = 0;
+
+int main(int argc, char **argv){
+	
+	// Use threadMaker function to make a simpleGPIO_thread, an infinite train with frequency = 1kHz, and duty cycle = 0.001
+	// SimpleGPIO_threadMaker calls pulsedThread constructor
+	SimpleGPIO_thread *  myGPIO= SimpleGPIO_thread::SimpleGPIO_threadMaker (GPIO_PIN, POLARITY, (float)1000,(float)0.001, (float)0, ACC_MODE_SLEEPS_AND_SPINS);
+	if (myGPIO == nullptr){
+		printf ("SimpleGPIO_thread object was not created. Now exiting...\n");
+		return 1;
+	}
+	// make an array of floats and fill it with values that vary from 0 to 1 in a sinusoidal fashion
+	float * endFuncArrayData = new float [100];
+	myGPIO->cosineDutyCycleArray (endFuncArrayData, 100, 100, 0.5, 0.5);
+	// Set a pointer to this array as endFunc data 
+	myGPIO->setUpEndFuncArray (endFuncArrayData, 100, 1);
+	// choose the endFunc to modify pulse dutycycle from the array  
+	myGPIO->chooseArrayEndFunc (kDUTY_CYCLE);
+	// start the train
+	myGPIO ->startInfiniteTrain ();
+	// let it run for 20 seconds
+	myGPIO->waitOnBusy (20);
+	// change the part of the array that the endFunc iterates over to the middle part of the array
+	int result = myGPIO->setEndFuncArrayLimits (24, 75, 1);
+		if (result){
+		printf ("setEndFuncArrayLimits reported an error. Now exiting...\n");
+		return 1;
+	}
+	// wait another 20 seconds, then stop the train
+	myGPIO->waitOnBusy (20);
+	myGPIO->stopInfiniteTrain();
+	// clean up, but be sure train is stopped before deleting it
+	myGPIO->waitOnBusy (10);
+	delete (myGPIO);
+	// delete our endFunc array
+	delete (endFuncArrayData);
+	return 0;
+}
 </pre>
-<p>The arrayData is provided by the user. A callback designed to be used with pulsedThread::modCustom, pulsedThreadSetUpArrayCallback, can be used to copy a pointer to the user's arrayData to the arrayData pointer in the pulsedThreadArrayStruct. <br>
-int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask);<br>
-The modData is a pulsedThreadArrayStruct, same  as is used by the endFunc itself. pulsedThreadSetUpArrayCallback does the following:
-<ol>
-	<li>cast modData to a pulsedThreadArrayStructPtr</li>
-	<li>make a new pulsedThreadArrayStruct , and point endFuncDataPtr at it</li>
-	<li>copy over the data from modData, Don't copy array data, just a pointer to the array.</li>
-	<li>delete modData</li>
-</ol>
-Note that the arrayData array itself is not copied, so the user must take care to keep the arrayData from being deleted.  The startPos, endPos, and arrayPos are copied.</p>
+ Run the output of the GPIO pin through an oscilloscope to see the duty cycle change from 0 to 1 and back to 0 10 times a second. Run the output through a low pass filter first to see a fairly clean cosine wave with a frequency of 10 Hz</p>
 
-<p></p>
-/* **************custom struct for a modFunction endFunc Data using an array*****************************
-Used to modify which section of the array to currently use, or set current position in the array */
-typedef struct pulsedThreadArrayModStruct{
-	int modBits;			// bit-wise for which param to modify, 1 for startPos, 2 for endPos, 4 for arrayPos
-	unsigned int startPos; 	// where to start in the array when out putting data
-	unsigned int endPos;	// where to end in the array
-	unsigned int arrayPos;	// current position in array, as it is iterated through
-}pulsedThreadArrayModStruct, *pulsedThreadArrayModStructPtr;
+<h2>About the Pthread</h2>
+<p>For those wanting a better understanding of how pulsedThread works behind the scenes, a description of the functions and data used by the Pthread are presented here. The pulsedThread constructors create a new Pthread and start it running pulsedThreadFunc with a pointer to a taskParams Structure, theTask:<br>
+pthread_create(&theTask.taskThread, NULL, &pulsedThreadFunc, (void *)&theTask);<br>
+The constructors also initialize a mutex and a condition variable used for signaling between the pulsedThread object and the Pthread running pulsedThreadFunc, and save pointers to these in thetask:<br>
+pthread_mutex_init(&theTask.taskMutex, NULL);<br>
+pthread_cond_init (&theTask.taskVar, NULL);<br>
+</p>
 
+<h2><a name= "pulsedThreadFunc">pulsedThreadFunc function run by Pthread</a></h2>
+<p>In order to be run by a Pthread, our pulsedThreadFunc must be a C-style function, not a C++ class method:<br>
+extern "C" void* pulsedThreadFunc (void * tData){<br>
+tData is a void pointer to the taskParams Structure we referred to in pthread_create. The first thing pulsedThreadFunc does is cast tData to a task param stuct pointer<br>
+taskParams *theTask = (taskParams *) tData;</p>
 
-/* *************************** Function Declarations for non-class Functions used by pthread **********************************/
-int pulsedThreadSetUpArrayCallback (void * modData, taskParams * theTask);
-int pulsedThreadSetArrayLimitsCallback (void * modData, taskParams * theTask);
-void pulsedThreadFreqFromArrayEndFunc (void * endFuncData, taskParams * theTask);
-void pulsedThreadDutyCycleFromArrayEndFunc (void * endFuncData, taskParams * theTask);
-void pulsedThreadArrayStructCustomDel(void * taskData);
+<p>The basic strategy of a resident thread, as opposed to a thread that does a task and then exits, is to do any needed initialization, and then enter an infinite loop, waiting for tasks to be requested, and doing the tasks. This is the strategy used by pulsedThreadFunc. In the initialization, pulsedThreadFunc makes some structures used for pulse delay and duration timing, and requests the maximum priority from the operating system thread scheduler.</p>
 
+<p>pulsedThreadFunc then enters an infinite loop, an enpty for loop in this case:
+<pre>
+// loop forever, doing task and modding task
+for (;;){
+	// get the lock on doTask and wait for a task to be called, or a timing or customMod param to be modded
+	pthread_mutex_lock (&theTask->taskMutex);
+	while (theTask->doTask==0)
+		pthread_cond_wait(&theTask->taskVar, &theTask->taskMutex);
+</pre>
+Using the Pthreads library function pthread_cond_wait, the execution of pulsedThreadFunc is stalled until theTask->doTask is modified from outside the Pthread by the pulsedThread object. Setting doTask to the number of pulses or trains requested is how a pulsedThread object requests the Pthread to start a pulse or a train. Note that the higher order bits of doTask are used to signal pulsedThreadFunc to change timing paramaters or custom data. You can have many pulsedThread objects extant at once, but they only use processor time when they are actively doing a task.</p>
 
-<h2>The Pthread stuff</h2>
-For those wanting a better understanding of how pulsedThread works behind the scenes, a description of the functions used by the Pthread are presented here
+<p>Once woken by a change to doTask, pulsedThreadFunc first looks for modifications of the taskVar that would require it to reconfigure timers for pulse delay and duration, or to run a function to modify custom data.</p>
 
 <a name= "taskParams_Struct"><h3>taskParams Structure</h3></a>
 the taskParams structure is readable and writable by methods of the pulsedThread object and from the Pthread running pulsedThreadFunc. The fields of the taskParams structure are:
 
-<h3>int accLevel</h3><p>This value sets the method that the pthread uses to control pulse timing. Threads can: 0) sleep for pulse duration/delay, 1) sleep for most of the delay duration, waking up and looping for the last few hundred microseconds (controlled by constant kSLEEPTURNAROUND), or 2) re-calculate sleep time for each duration/delay, and completely countermand sleeping if pthread is running late.</p>
+<h4>int accLevel</h4><p>This value sets the method that the pthread uses to control pulse timing. Threads can: 0) sleep for pulse duration/delay, 1) sleep for most of the delay duration, waking up and looping for the last few hundred microseconds (controlled by constant kSLEEPTURNAROUND), or 2) re-calculate sleep time for each duration/delay, and completely countermand sleeping if pthread is running late.</p>
 
-<h3>unsigned int doTask</h3>
+<h4>unsigned int doTask</h4>
 The lower 29 bits of this 32 bit unsigned integer are used for setting/tracking number of tasks requested/left to do. Changes to this variable are made after calling pthread_mutex_lock, and the pthread is signalled that a change has been made with pthread_cond_signal. The pthread sleeps when doTask is zero, and wakes when doTask is non zero. For a finite length train or a pulse task, the pthread starts doing its task, decrementing doTask as it completes each task (single pulse or train), and sleeps again when doTask gets to 0. For an infinite train, the pthread starts when doTask =1 and stops the train when doTask = 0, but as it only reads and never writes to doTask, locking the mutex is not required.
 
 <p>The upper 3 bits of doTask are reserved for alerting the pthread that pulse delay, pulse duration, or custom thread data have been changed:
@@ -620,7 +703,7 @@ The lower 29 bits of this 32 bit unsigned integer are used for setting/tracking 
 </table>
 Setting any of these these bits from the pulsedThread object causes the pthread to be awakened and it will change timers for delay/duration or call the custom task modification function. The pthread will then unset the signal bits.</p>
 
-<h3>Pulse Description</h3>
+<h4>Pulse Description</h4>
 The timing of pulses is stored in two complementary ways, one based on delay and duration times, and the other on frequency and duty cycle.  
 <table cellspacing="0" cellpadding="0" border = "1">
 	<caption>Pulse Description (time based)</caption>
@@ -659,31 +742,33 @@ The timing of pulses is stored in two complementary ways, one based on delay and
 </table>
 This duplication is for the benefit of functions that, for example, change train frequency without changing train duration by modifying the number of pulses. Frequency-based description is not well suited for describing single pulses. Pulse timing by the pthread always uses the time based microseconds, with nanosleep function.
 
-<h3>void (*hiFunc)(void *) and void (*loFunc)(void *)</h3>
+<h4>void (*hiFunc)(void *) and void (*loFunc)(void *)</h4>
 hiFunc and loFunc are pointers to the custom functions that run at the start of the duration (High Function) and delay (Low Function) periods of a pulse. The user needs to provide these functions when creating a new pulsedThread object. They each get a void pointer to custom taskData, which they can recast to the correct type to operate on.  The execution time of hiFunc and loFunc need to be short relative to pulse delay/duration.
 
-<h3>void * taskData</h3>
+<h4>void * taskData</h4>
 taskData is a pointer to data customized for the thread's main task, running hiFunc and loFunc.  Any needed data other than pulse timing and number are accessed with this pointer.  It needs to be initialized when the pthread is started, with anything from a single value to a large structure, depending on what the task of the pthread needs. The hiFunc and loFunc are both passed this pointer.  Remember that the pulsedThread object can access this data as well, so it can be used to return data as well as to signal a thread. If the pulsedThread object writes to the parts of taskData used by the pulsedThreadFunc function, you may wish to use the mutex for protection.
 
-<h3>void * endFuncData</h3>
+<h4>void * endFuncData</h4>
 Pointer to optional function that can be set to run at the end of every task. Thus, it would run at the end of a train (nPulses &gt2;= 2), or at the end of each pulse for an infinite train or single pulse. The task structure includes a pointer specifically for data used by an endFunction, but the endFunction gets the pointer to the whole task structure, so it may be used, e.g, to change task timing.
 
-<h3>void (*endFunc)(void *, taskParams *)</h3>
+<h4>void (*endFunc)(void *, taskParams *)</h4>
 An end Function is a function pointer to an optional user-provided function that runs at the end of each train for tasks configured as finite length trains, or at the end of each pulse for tasks configured as a single pulse or an infinite train.  An endFunc gets a void pointer to the endFunc data, plus a pointer to the whole taskParams structure, to make it easy for an endFunc to modify pulse timing or number.  If the user does not provide an endFunc, the pointer for endFunc will be NULL, and no endFunc will be run by pulsedThreadFunc.
 
-<h3>void * endFuncData</h3>
+<h4>void * endFuncData</h4>
 endFuncData is a pointer specially reserved for data customized for an End Function, if one is installed. This pointer is separate from the taskData pointer so that handling of End Functions and associated data can be independent of hiFunc and loFunc task data.  That is, you can have an endFunc that is task agnostic, and you can install and un-install End Functions without affecting the main task.
 
-<h3>int (*modCustomFunc)(void *, taskParams *)</h3>
+<h4>int (*modCustomFunc)(void *, taskParams *)</h4>
 modCustomFunc is a pointer to a user-provided function that is run by pulsedThreadFunc when kMODCUSTOM is set in doTask. This provides a thread-safe way to modify the task data or endFunc data, as pulsedThreadFunc will wait until a pulse ot train is completed before running the modCustomFunc. The modCustomFunc gets a pointer to modCustomData and a pointer to taskParams.
 
-<h3>void * modCustomData</h3>
+<h4>void * modCustomData</h4>
 modCustomData is pointer to the data to be used by a modCustomFunc to modify the task data or endFunc data. It needs to be initialized before modCustomFunc is called.
 
-<h3>pthread_t taskThread, pthread_mutex_t taskMutex, and pthread_cond_t taskVar</h3>
-These are data structures provided by pthread.h.  taskThread is a pthread structure, initialized when the pthread is created, and freed in the pulsedThread destructor.  taskMutex is a mutex that is used in the lock and unlock operations to prevent simultaneous writing by the pthread and the pulsedThread object to doTask or perhaps taskData or endFuncData.  taskVar is a conditon variable used to signal from a pulsedThread object to the associate pthread that doTask has been modified and there is work to do.  The pthread uses the pthread_cond_wait function to sleep until a task has been called, then does the task(s)and sleeps again.
+<h4>pthread_t taskThread, pthread_mutex_t taskMutex, and pthread_cond_t taskVar</h4>
+These are data structures provided by pthread.h. taskThread is a pthread structure, initialized when the pthread is created, and freed in the pulsedThread destructor. taskMutex is a mutex that is used in the lock and unlock operations to prevent simultaneous writing by the pthread and the pulsedThread object to doTask or perhaps taskData or endFuncData.  taskVar is a conditon variable used to signal from a pulsedThread object to the associate pthread that doTask has been modified and there is work to do.  The pthread uses the pthread_cond_wait function to sleep until a task has been called, then does the task(s)and sleeps again.
 
-<h2><a name= "pulsedThreadFunc">pulsedThreadFunc function run by Pthread</a></h2>
+
+
+
 <a name= "Python_C_Module"><h2>Using pulsedThread in a Python/C Module</h2></a>
 <p>To use the pulsedThread C++ library in a Python module, you can start with the wrapper functions provided in the file pyPulsedThread.h.  These functions are designed to work with a pulsedThread object on the C++ side of things and a PyCapsule object containing a pointer to that pulsedThread object on the Python side of things. For general information on writing Python/C modules, see the <a href="https://docs.python.org/3.4/c-api/index.html">Python/C API Reference Manual</a></p>
 

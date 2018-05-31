@@ -26,9 +26,9 @@ Last Modified:
 
 
  /* ***define beVerbose to non-zero to print out messages that may be useful for debugging or understanding how the code runs ****/
- #define beVerbose 0
- #if beVerbose
- #include <stdio.h>
+#define beVerbose 0
+#if beVerbose
+#include <stdio.h>
 #endif
 /* *************************************constants for timing methods: ***************************************************************/
 const int ACC_MODE_SLEEPS = 0;				// thread sleeps for duration of period
@@ -50,6 +50,10 @@ const unsigned int kMODDELAY = 536870912; 		//2^29
 const unsigned int kMODDUR = 1073741824;		//2^30
 const unsigned int kMODCUSTOM = 2147483648;	//2^31
 const unsigned int kMODANY = 3758096384;		//2^29 + 2^30 + 2^31
+
+/* *******************************************constants for modFunctions that change train timing ********************************************/
+const int kFREQUENCY =0;
+const int kDUTY_CYCLE =1;
 
 /* ***************this C-style struct contains all the relevant thread variables and task variables, and is passed to the thread function *********
 last modified:

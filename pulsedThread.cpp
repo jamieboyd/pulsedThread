@@ -948,7 +948,7 @@ int pulsedThreadSetArrayLimitsCallback (void * modData, taskParams * theTask){
 	// cast modData to a pulsedThreadArrayStructPtr
 	pulsedThreadArrayModStructPtr modDataPtr = (pulsedThreadArrayModStructPtr)modData;
 	// cast endFuncDataPtr to pulsedThreadArrayStructPtr
-	pulsedThreadArrayStructPtr endFuncDataPtr = (pulsedThreadArrayStructPtr)theTask->endFuncData ;
+	pulsedThreadArrayStructPtr endFuncDataPtr = (pulsedThreadArrayStructPtr)theTask->endFuncData;
 	// copy over the data from modData
 	if ((modDataPtr->modBits) & 1){
 		endFuncDataPtr -> startPos = modDataPtr->startPos; // starting position in the array
@@ -963,6 +963,10 @@ int pulsedThreadSetArrayLimitsCallback (void * modData, taskParams * theTask){
 	if ((endFuncDataPtr -> arrayPos < endFuncDataPtr -> startPos) || (endFuncDataPtr -> arrayPos > endFuncDataPtr -> endPos)){
 		endFuncDataPtr -> arrayPos = endFuncDataPtr -> startPos;
 	}
+#if beVerbose
+	printf ("array start position changed to %i\n", endFuncDataPtr-> startPos);
+	printf ("array end position changed to %i\n", endFuncDataPtr-> endPos);
+#endif
 	// delete modData
 	delete ((pulsedThreadArrayModStructPtr)modData);
 	return 0;

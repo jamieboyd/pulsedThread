@@ -1,4 +1,4 @@
-# setup.py
+# setup_ptGreeter.py
 from distutils.core import setup, Extension
 
 setup(name='ptGreeter',

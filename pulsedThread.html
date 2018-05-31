@@ -46,17 +46,19 @@ Make sure to run make install before running make greeter or make minimalGreeter
 	<li><a href = "#Minimaller_App">An Even More Minimal Application Example</a></li>
 	<li><a href = "#GPIO_App">End-Function Application Example with GPIO</a></li>
 	
-	<li>About the Pthread</li>
+	<li>About the Pthread
 	<ol>
 		<li><a href= "#pulsedThreadFunc">pulsedThreadFunc function</a></li>
 		<li><a href= "#taskParams_Struct">the taskParams structure</a></li>
 		<li><a href = "#Timing_Utilities">Timing Utilities</a></li>
-	</ol>
-	
+	</ol></li>
 	
 	<li>Using pulsedThread in a Python C++ Module
 		<ol>
 		<li><a href= "#Python_Wrappers">Python Wrappers</a></li>
+		<li><a href = "#pyGreeter">Sample Python C++ Module Example</a></li>
+		<li><a href = "#ptPYFuncs">ptPyFuncs: pulsedThreads with Python Functions</a></li>
+		<li><a href="#ptPyFuncs_GPIO">ptPyFuncs with Raspberry Pi GPIO</a></li>
 		</ol>
 	</li>
 	
@@ -594,7 +596,7 @@ Thread is done printing and so am I
 <p>Here is a simple application from the <a href= "https://github.com/jamieboyd/GPIO_Thread">GPIO_Thread</a> project using SimpleGPIO_thread, a sub-class of the pulsedThread class that makes pulses and trains of pulses on a GPIO pin. This program runs an infinite train at 1 kHz. At the end of each pulse, the end-function that changes duty cycle is called. A 100 point array containing a cosine scaled from 0 to 1 provides the dudy cycles. After 20 seconds, we change the part of the array that the endFunc iterates over to just the middle part of the array, centered over the peak of the cosine wave.
 <pre>
 #include "SimpleGPIO_thread.h"
-#include <stdio.h>
+#include &lt;stdio.h&gt;
 
 /* ******************************** makes a GPIO output that does software pulse width modulation *********************************************/
 static const int GPIO_PIN = 19;
@@ -775,11 +777,20 @@ modCustomData is pointer to the data to be used by a modCustomFunc to modify the
 These are data structures provided by pthread.h. taskThread is a pthread structure, initialized when the pthread is created, and freed in the pulsedThread destructor. taskMutex is a mutex that is used in the lock and unlock operations to prevent simultaneous writing by the pthread and the pulsedThread object to doTask or perhaps taskData or endFuncData.  taskVar is a conditon variable used to signal from a pulsedThread object to the associate pthread that doTask has been modified and there is work to do.  The pthread uses the pthread_cond_wait function to sleep until a task has been called, then does the task(s)and sleeps again.
 
 <h2>Using pulsedThread in a Python/C Module</h2>
-<p>A Python/C module uses normal C or C++ code, such as that described in pulsedThread.h, plus the special C functions defined in Python.h that can interact with Python objects and provide the means for Python functions to call C and C++ code.  For general information on writing Python/C modules, see the <a href="https://docs.python.org/3.4/c-api/index.html">Python/C API Reference Manual</a>.  A Python/C module provides Python functions that behave like normal Python functions but call directly into and receive results from custom C/C++ code.  The file pyPulsedThread.h. includes both pulsedThread.h and Python.h and provides functions for a Python interface to the pulsedThread C++ library.</p>
+<p>A Python/C module uses normal C or C++ code, such as that described in pulsedThread.h, plus the special C functions defined in Python.h that can interact with Python objects and provide the means for Python functions to call C and C++ code. For general information on writing Python/C modules, see the <a href="https://docs.python.org/3.4/c-api/index.html">Python/C API Reference Manual</a>.  A Python/C module provides Python functions that behave like normal Python functions but call directly into and receive results from custom C/C++ code.  The file pyPulsedThread.h. includes both pulsedThread.h and Python.h and provides functions for a Python interface to the pulsedThread C++ library. The steps to writing a Python/C module:
+<ol>
+<li>write C++ functionality, or include existing C++ library (pulsedThread.h, in this case)</li>
+<li>include Python.h</li>
+<li>write C++ functions that are called from Python, parse Python arguments, use the C++ functionality, and return Python objects</li>
+<li>make a method table that describes the functions and their paramater lists as they are called from Python</li>
+<li>define a module structure and a module initialization function - these are pretty much boiler-plate</li>
+<li>write a Python setup script that uses distutils to call the C compiler to compile your module, and optionally install it in the Python library folder</li>
+</ol>
+It sounds complicated, but some of the code is the same for all modules, and can be copied with just a few name changes.</p>
 
-<p> The functions in pyPulsedThread.h are designed to work with a pulsedThread object on the C++ side of things and a PyCapsule containing a pointer to that pulsedThread object on the Python side of things. A Capsule is a Python data type which stores a pointer (void *). Capsules can only be created and accessed via their C API, but they can be passed around like any other Python object.</p>
+<p>The functions in pyPulsedThread.h are designed to work with a pulsedThread object on the C++ side of things and a PyCapsule containing a pointer to that pulsedThread object on the Python side of things. A Capsule is a Python data type which stores a pointer (void *). Capsules can only be created and accessed via their C API, but they can be passed around like any other Python object.</p>
 
-<p>When writing a Python/C module using pulsedThread, as when using the pulsedThread library directly from C++, the programmer supplies C++ functions for initialization of the taskCustom data, and the HI and LO event functions.  The hiFunc and loFunc and optional endFunc are C functions, but can make callbacks into the Python environment.  Your C++ initialization function is called from Python, creates a pulsedThread object, and uses the PyCapsule_New function from the Python/C API to return a PyCapsule containing a pointer to that pulsedThread object back to Python.  The functions in pyPulsedThread.h can then interact with the PyCapsule object asking it to do tasks and configure pulse/train timing.  These functions are called from Python with the PyCapsule created earlier plus task and timing information.  The functions in pyPulsedThread.h parse their Python-derived arguments into C/C++ data and object references and, in turn, call methods from pulsedThread.  The functions in pyPulsedThread.h thus provide Python wrappers for the pulsedThread class.</p>
+<p>When writing a Python/C module using pulsedThread, as when using the pulsedThread library directly from C++, the programmer supplies C++ functions for initialization of the taskCustom data, and the HI and LO event functions. The hiFunc and loFunc and optional endFunc are C functions, but can make callbacks into the Python environment.  Your C++ initialization function is called from Python, creates a pulsedThread object, and uses the PyCapsule_New function from the Python/C API to return a PyCapsule containing a pointer to that pulsedThread object back to Python. Your Python code needs to hang on to this PyCapsule, as it provides the only link from Python to the pulsedThread object. The functions in pyPulsedThread.h are called from Python with that PyCapsule plus task requests or pulse timing information as arguments. The functions in pyPulsedThread.h parse these Python-derived arguments into a pointer to a pulsedThread object plus other C data types as appropriate, and, in turn, call the pulsedThread object's methods. The functions in pyPulsedThread.h thus provide Python wrappers for the pulsedThread class.</p>
 
 <a name= "Python_Wrappers"><h3>Python Wrappers</h3></a>
 <p>Wrappers for almost all of the pulsedThread library control functions and setters and getters are provided in pyPulsedThread.h.  To call them from a Python/C module, you need to supply a module method table, defining the Python names of the functions and the paramaters they accept.  You can use the one from pyGreeter.cpp as a guide, adding only yuor own initialization function.  The Python functions from pyPulsedThread.h, then, are called like this:
@@ -837,9 +848,9 @@ These are data structures provided by pthread.h. taskThread is a pthread structu
 </dl>
 
 <a name = "pyGreeter"><h3>Sample Python C++ Module Example</h3></a>
-<p>The file pyGreeter.cpp makes a simple Python C++ module using pyPulsedThread.h. pyGreeter.cpp provides a single function that makes a pulsedThread object and returns a pyCapsule containing a pointer to it:
+<p>The file pyGreeter.cpp makes a simple Python C++ module using pyPulsedThread.h. pyGreeter.cpp provides a single function that makes a pulsedThread object and returns a pyCapsule containing a pointer to it. The hiFunc and LoFunc passes to the pulsedThread constructor is recyled from <a href="#Minimal_Application">Greeter.h</a>, which is included. So when you run the Greeter module from Python, you already know what it is going to do.
 <pre>
-#include <pyPulsedThread.h>
+#include &lt;pyPulsedThread.h&gt;
 #include "Greeter.h"
 /******************************C++ Code that is called from Python - forming the interface to the Python Module*****************
 This is where you put functions to create and interact with the C++ pulsedThread object, and also use function from Python.h to 
@@ -870,68 +881,168 @@ static PyObject* pulsed_C_Greeter (PyObject *self, PyObject *args) {
 		PyErr_SetString (PyExc_RuntimeError, "Could not make a new pulsedThread object.");
 		return NULL;
 	}else{
-		return PyCapsule_New (static_cast <void *>(threadObj), "pulsedThread", pulsedThread_del);
+		return PyCapsule_New (static_cast &lt; void *&lgt; (threadObj), "pulsedThread", pulsedThread_del);
 	}
   }
+</pre></p>
+
+<p>pulsed_C_Greeter (PyObject *self, PyObject *args);<br>
+The parameters passed to this function from Python are a string for a name, and an integer for timing mode. The C module interface passes them to C++ as a pointer to a python object, PyObject *args, and the C module interface function PyArg_ParseTuple is used to parse it into a string and an integer:<br>
+const char * localName;<br>
+int accLevel;<br>
+PyArg_ParseTuple(args,"is",  &amp;accLevel, &amp;localName));</p>
+
+<p>pulsed_C_Greeter makes a new pulsedThread object using the same init, hi, and lo functions, ptTest_Init, ptTest_Hi, and ptTest_Lo, that were used in Greeter.cpp, by #including the Greeter.h header file. pulsed_C_Greeter uses the microsecond delay, microsecond duration, and number of pulses method:<br>
+pulsedThread * threadObj = new pulsedThread ((unsigned int)50000, (unsigned int)50000, (unsigned int)10, (void * volatile) &amp;initStruct, &amp;ptTest_Init, &amp;ptTest_Lo, &amp;ptTest_Hi, accLevel, errCode)</p>
+
+<p>Note that printing from the C++ side of things, as done by pt_Test_Hi and ptTest_Lo, means that printed messages appear in the terminal window. This is seamless if launching Python from the terminal. If using an environment like IDlE, launch it from a terminal window, not from the menu, with: idle3 &amp; Then the messages from the C++ module will appear in the terminal window from which IDlE was launched.</p>
+
+<p>Finally, pulsed_C_Greeter returns to Python a PyCapsule wrapping the pulsedThread object:<br>
+return PyCapsule_New (static_cast &lt;void *&gt;(threadObj), "pulsedThread", pulsedThread_del);</p>
+
+<p>You can build the module ptGreeter with the provided Python setup script:
+<pre>
+# setup_ptGreeter.py
+from distutils.core import setup, Extension
+
+setup(name='ptGreeter',
+      author = 'Jamie Boyd',
+      author_email = 'jadobo@gmail.com',
+      py_modules=['PTGreeter'],
+      ext_modules=[
+        Extension('ptGreeter',
+                  ['Greeter.cpp', 'pyGreeter.cpp'],
+                  include_dirs = ['./',  '/usr/include'],
+                  library_dirs = ['./', '/usr/local/lib'],
+		  extra_compile_args=["-O3", "-std=gnu++11"],
+                  libraries = ['pulsedThread'],
+                  )
+        ]
+)
 </pre>
-pulsed_C_Greeter (PyObject *self, PyObject *args);
-The parameters passed to this function from Python are a string for a name, and an integer for timing mode. The C module interface passes them to C++ as a pointer to a python object, PyObject *args, and the C module interface function PyArg_ParseTuple is used to parse it into a string and an integer.
+The script sets up options for the C compiler, including names of the needed files, Greeter.cpp and pyGreeter.cpp, and libraries, pulsedThread in this case. It also sets the name of the compiled extension module, ptGreeter, and marks the Python module PTGreeter, described below, for installation into the Python library folder. The script can be run as:<br>
+python3 setup_ptGreeter.py build_ext --inplace<br>
+Use "build_ext --inplace" instead of "install" to install it in the local folder so you can easily delete it after building it and running it, as it is not useful enough to be a permanently installed library.</p>
 
-const char * localName;
-int accLevel;
-PyArg_ParseTuple(args,"is",  &amp;accLevel, &amp;localName));
-pulsed_C_Greeter makes a new pulsedThread object using the same init, hi, and lo functions, ptTest_Init, ptTest_Hi, and ptTest_Lo, that was used in Greeter.cpp, by #including the Greeter.h header file. pulsed_C_Greeter uses the microsecond delay, microsecond duration, and number of pulses method:
+<p>The Python code in PTGreeter.py demonstrates making a wrapper providing a "Pythonic" interface, the class PT_Greeter, for an external module based on the C++ pulsedThread library, in this case ptGreeter. A PTGreeter object contains a field, task_ptr, for a PyCapsule object containing a pointer to a pulsedThread object on the C++ side.</p>
+<pre>
+import ptGreeter
 
-pulsedThread * threadObj = new pulsedThread ((unsigned int)50000, (unsigned int)50000, (unsigned int)10, (void * volatile) &amp;initStruct, &amp;ptTest_Init, &amp;ptTest_Lo, &amp;ptTest_Hi, accLevel, errCode)
+class PT_Greeter (object):
+    def __init__ (self, accuracy_level, message):
+        self.task_ptr = ptGreeter.pulsed_C_Greeter(accuracy_level,message)
 
-Note that printing from the C++ side of things, as done by pt_Test_Hi and ptTest_Lo, means that printed messages appear in the terminal window. This is seamless if launching Python from the terminal. If using an environment like IDlE, launch it from a terminal window, not from the menu, with: idle3 &amp; Then the messages from the C++ module will appear in the terminal window from which IDlE was launched.
+    def greet(self):
+        ptGreeter.doTask(self.task_ptr)
+.
+.
+.
+if __name__ == '__main__':
+    try:
+        myGreeter =  PT_Greeter (PT_Greeter.ACC_MODE_SLEEPS_AND_SPINS, "C++ python interfacing")
+    except Exception as e:
+        print (e)
+        quit()
+    print ("Default goodbye time is ",  myGreeter.get_goodbye_time(), ' seconds')
+    myGreeter.set_hello_time (0.25)
+    myGreeter.set_goodbye_time (1)
+    myOtherGreeter =  PT_Greeter (PT_Greeter.ACC_MODE_SLEEPS, "the other greeter")
+    myOtherGreeter.set_hello_time (1)
+    myOtherGreeter.set_goodbye_time (2)
+    myOtherGreeter.set_num_greets (5)
+    myGreeter.set_num_greets (11)
+    myGreeter.greet()
+    myOtherGreeter.greet()
 
-Finally, pulsed_C_Greeter returns to Python a PyCapsule wrapping the pulsedThread object:
+    i =0
+    result =0
+    while (myGreeter.is_greeting () > 0 and myOtherGreeter.is_greeting () > 0):
+        result += (i*i/(i + 1))
+        if i%5000 == 0:
+            print ('result ', i, '= ', result)
+        i +=1
+                        
+    print ('Greeters are finished now. Final result was', result)
+</pre>
 
-return PyCapsule_New (static_cast &lt;void *&gt;(threadObj), "pulsedThread", pulsedThread_del);
-You can build the module ptGreeter with the provided Python setup script.
+<p>The main function works similarly to that of the C++ program described in Greeter.cpp. It makes two pulsedThreads that print greetings, and sets them running at the same time. Then it starts doing calculations and printing results in a loop.</p>
 
-python3 setup_ptGreeter.py build_ext --inplace
+<h4>Sample output from PTGreeter.py:</h4>
+<pre>
+python3 PTGreeter.py
+Default goodbye time is  0.05000000074505806  seconds
+Hello  from C++ python interfacing
+result  0 =  0.0
+Hello  from the other greeter
+result  5000 =  12497508.094708782
+result  10000 =  49995008.787705876
+goodbye  from C++ python interfacing
+result  15000 =  112492509.193121
+result  20000 =  199990009.48077822
+result  25000 =  312487509.70390695
+result  30000 =  449985009.88621867
+result  35000 =  612482510.0403633
+result  40000 =  799980010.1738888
+result  45000 =  1012477510.291669
+result  50000 =  1249975010.397009
+result  55000 =  1512472510.49232
+goodbye  from the other greeter
+result  60000 =  1799970010.579323
+result  65000 =  2112467510.6593883
+Hello again for the 2th time from C++ python interfacing
+result  70000 =  2449965010.733463
+result  75000 =  2812462510.8024473
+result  80000 =  3199960010.8670087
+goodbye again for the 2th time from C++ python interfacing
+.
+.
+.
+result  665000 =  221112167511.9994
+Hello again for the 11th time from C++ python interfacing
+result  670000 =  224449665011.9994
+result  675000 =  227812162511.9994
+goodbye again for the 11th time from C++ python interfacing
+result  680000 =  231199660011.9994
+result  685000 =  234612157511.9994
+result  690000 =  238049655011.9994
+goodbye again for the 5th time from the other greeter
+result  695000 =  241512152511.9994
+result  700000 =  244999650011.9994
+result  705000 =  248512147511.9994
+result  710000 =  252049645011.9994
+result  715000 =  255612142511.9994
+result  720000 =  259199640011.9994
+result  725000 =  262812137511.9994
+result  730000 =  266449635011.9994
+Greeters are finished now. Final result was 269134733957.9994
+</pre>
 
-Use "build_ext --inplace" instead of "install" to install it in the local folder so you can easily delete it after building it and running it, as it is not useful enough to be a permanently installed library.
+<a name = "ptPYFuncs"><h3>ptPyFuncs: pulsedThreads with Python Functions</h3></a>
+<p>ptPyFuncs is a Python C++ module that allows you to use the pulsedThread C++ library from Python for threading and timing of Python tasks without writing and compiling a dedicated Python C++ module. ptPyFuncs provides functions to initialize a pulsedThread with a Python object that has HiFunc, LoFunc, and (optionally) endFunc methods.</p>
 
-The Python code in PTGreeter.py demonstrates making a wrapper providing a "Pythonic" interface, the class PT_Greeter, for an external module based on the C++ pulsedThread library, in this case ptGreeter. A PTGreeter object contains a field, task_ptr, for a PyCapsule object containing a pointer to a pulsedThread object on the C++ side. The main function works similarly to that of the C++ program described in Greeter.cpp. It makes two pulsedThreads that print greetings, and sets them running at the same time. Then it starts doing calculations and printing results in a loop.
+<p>ptPyFuncs.initByPulse (Python object, int lowTicks, int highTicks,int nPulses, int ACClevel)<br>
+ptPyFuncs.initByFreq (Python object, frequency, duty Cycle, float train duration, accuracy_level)<br>
+In both cases, the first argument is a Python object that MUST have methods named exactly "HiFunc" and "LoFunc" that don't take extra parameters other than self. The other parameters for initialization are for pthread timing which is done as usual in C++ as described earlier. Now, however, the high, low and end functions are callbacks to the Python object's HiFunc, LoFunc, and EndFunc, and thus run in Python with full access to the Python environment. Yes, with some care, a Python C module can call Python functions, even from separate C threads. The Python interpreter runs only one thread at a time and uses a Global Interpreter Lock (GIL) to arbitrate which thread is currently running. The code in ptPyFuncs uses Python/C API functions PyGILState_Ensure to get the lock before calling any Python functions and PyGILState_Release to release the lock when finished. It is possible to end up in a deadlock if, for instance, a C module function gets the GIL and then calls a Python function that calls another C module function that also tries to get the GIL.</p>
 
+<p>As described before, both init functions return a PyCapsule object wrapping the C++ pulsedThread object, allowing it to be controlled with the entire set of functions from pyPulsedThread.h. Setting timing and requesting tasks functions as before.</p>p>
 
+<p>You can change the Python object whose functions the pulsedThread C++ object calls with:<br>
+ptPyFuncs.setTaskObject(PyCapsule, Python Object)<br>
+The first argument is the Python pyCapsule that points to the pulsedThread, and the second argument is a Python object providing the HI and LO functions, as described previously.</p>
 
+<p>You can set an endFunction from a Python object, which can be the same object as used for the task, with:<br>
+ptPyFuncs.setEndFunctionObject(PyCapsule, Python Object, functionParamType)<br>
+The Python Object must have a method named exactly "EndFunc" that gets passed 4 parameters describing pulse number and timing. If functionParamType is 0, the endFunc is called with with microseond pulse delay, duration, and number of pulses as the first three parameters. If functionParamType is non-zero, the endFunc is called with train frequency, duty cycle, and train length. In either case, the 4th parameter is the number of tasks left to be done.</p>
 
+<p>You can install the ptPyFuncs module from a terminal with:<br>
+sudo python3 setup_pyPTpyFuncs.py install</p>
 
-12) ptPyFuncs: pulsedThreads with Python Functions
+<p>PT_Py_Greeter is a Python class that uses ptPyFuncs to, what else, print hellos and goodbyes. Only now, printing is done within the Python environment by Python objects. The PT_Py_Greeter class field task_ptr is a pyCapsule that points to a pulsedThread object on the C++ side of things. All the calls to the C++ code is through an object's task_ptr, which is created in the PT_Py_Greeter init method.</p>
 
-ptPyFuncs is a Python C++ module that allows you to use the pulsedThread C++ library from Python for threading and timing of Python tasks without writing and compiling a dedicated Python C++ module. ptPyFuncs provides functions to initialize a pulsedThread with a Python object that has HiFunc, LoFunc, and (possibly) endFunc methods.
+<p>The main function makes a PT_Py_Greeter and sets it going, then does some calculations in a loop, printing results as it goes, to show the independence of the threaded PT_Py_Greeter from the main code. The class field PSEUDO_MUTEX is used for preventing print statements from different places in the code from executing at the same time, which would lead to garbled output. Unlike a real mutex, execution is not halted while waiting on the PSEUDO_MUTEX, hence the loops with calls to sleep to allow the other threads of execution to continue while waitng for the PSEUDO_MUTEX to be free. Also, read/write to the PSEUDO_MUTEX is not atomic; one thread may read PSEUDO_MUTEX as 0, and set it to 1, but in the very brief interval between reading and writing to PSEUDO_MUTEX, another thread may have read PSEUDO_MUTEX as 0 and so both threads would think they have the mutex.</p>
 
-ptPyFuncs.initByPulse (Python object, int lowTicks, int highTicks,int nPulses, int ACClevel)
-ptPyFuncs.initByFreq (Python object, frequency, duty Cycle, float train duration, accuracy_level)
-In both cases, the first argument is a Python object that MUST have methods named exactly "HiFunc" and "LoFunc" that don't take extra parameters other than self. The other parameters for initialization are for pthread timing which is done as usual in C++ as described earlier. Now, however, the high, low and end functions are callbacks to the Python object's HiFunc, LoFunc, and EndFunc, and thus run in Python with full access to the Python environment. Yes, with some care, a Python C module can call Python functions, even from separate C threads. The Python interpreter runs only one thread at a time and uses a Global Interpreter Lock (GIL) to arbitrate which thread is currently running. The code in ptPyFuncs uses Python/C API functions PyGILState_Ensure to get the lock before calling any Python functions and PyGILState_Release to release the lock when finished. It is possible to end up in a deadlock if, for instance, a C module function gets the GIL and then calls a Python function that calls another C module function that also tries to get the GIL.
-
-As described before, both init functions return a PyCapsule object wrapping the C++ pulsedThread object, allowing it to be controlled with the entire set of functions from pyPulsedThread.h. Setting timing and requesting tasks functions as before.
-
-You can change the Python object whose functions the pulsedThread C++ object calls with:
-
-ptPyFuncs.setTaskObject(PyCapsule, Python Object)
-The first argument is the Python pyCapsule that points to the pulsedThread, and the second argument is a Python object providing the HI and LO functions, as described previously.
-
-You can set an endFunction from a Python object, which can be the same object as used for the task, with:
-
-ptPyFuncs.setEndFunctionObject(PyCapsule, Python Object, functionParamType)
-The Python Object must have a method named exactly "EndFunc" that gets passed 4 parameters describing pulse number and timing. If functionParamType is 0, the endFunc is called with with microseond pulse delay, duration, and number of pulses as the first three parameters. If functionParamType is non-zero, the endFunc is called with train frequency, duty cycle, and train length. In either case, the 4th parameter is the number of tasks left to be done.
-
-You can install the ptPyFuncs module from a terminal with:
-
-sudo python3 setup_pyPTpyFuncs.py install
-PT_Py_Greeter is a Python class that uses ptPyFuncs to, what else, print hellos and goodbyes. Only now, printing is done within the Python environment by Python objects.
-
-The PT_Py_Greeter class field task_ptr is a pyCapsule that points to a pulsedThread object on the C++ side of things. All the calls to the C++ code is through an object's task_ptr, which is created in the PT_Py_Greeter init method.
-
-The main function makes a PT_Py_Greeter and sets it going, then does some calculations in a loop, printing results as it goes, to show the independence of the threaded PT_Py_Greeter from the main code.The class field PSEUDO_MUTEX is used for preventing print statements from different places in the code from executing at the same time, which would lead to garbled output. Unlike a real mutex, execution is not halted while waiting on the PSEUDO_MUTEX, hence the loops with calls to sleep to allow the other threads of execution to continue while waitng for the PSEUDO_MUTEX to be free. Also, read/write to the PSEUDO_MUTEX is not atomic; one thread may read PSEUDO_MUTEX as 0, and set it to 1, but in the very brief interval between reading and writing to PSEUDO_MUTEX, another thread may have read PSEUDO_MUTEX as 0 and so both threads would think they have the mutex.
-
-
-
+<a name="ptPyFuncs_GPIO"><h3>ptPyFuncs with Raspberry Pi GPIO</h3></a>
+<p>One final example is presented using ptPyFuncs. PTpyGPIOTrain provides a simple example using ptPyFuncs with RPi.GPIO to time trains of pulses output on Raspberry Pi GPIO pins. The GPIO_Thread project does GPIO pulse control without need of Python call backs or RPi.GPIO</p>
 
 </body>
 </html>

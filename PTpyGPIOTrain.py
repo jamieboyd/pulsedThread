@@ -12,8 +12,6 @@ import ptPyFuncs
 from time import time, sleep
 import RPi.GPIO as GPIO
 from array import array as array
-#from math import cos, pi
-
 
 class PT_Py_GPIO_train (object):
     INIT_PULSES =1

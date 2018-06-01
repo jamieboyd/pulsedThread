@@ -1024,7 +1024,7 @@ Greeters are finished now. Final result was 269134733957.9994
 ptPyFuncs.initByFreq (Python object, frequency, duty Cycle, float train duration, accuracy_level)<br>
 In both cases, the first argument is a Python object that MUST have methods named exactly "HiFunc" and "LoFunc" that don't take extra parameters other than self. The other parameters for initialization are for pthread timing which is done as usual in C++ as described earlier. Now, however, the high, low and end functions are callbacks to the Python object's HiFunc, LoFunc, and EndFunc, and thus run in Python with full access to the Python environment. Yes, with some care, a Python C module can call Python functions, even from separate C threads. The Python interpreter runs only one thread at a time and uses a Global Interpreter Lock (GIL) to arbitrate which thread is currently running. The code in ptPyFuncs uses Python/C API functions PyGILState_Ensure to get the lock before calling any Python functions and PyGILState_Release to release the lock when finished. It is possible to end up in a deadlock if, for instance, a C module function gets the GIL and then calls a Python function that calls another C module function that also tries to get the GIL.</p>
 
-<p>As described before, both init functions return a PyCapsule object wrapping the C++ pulsedThread object, allowing it to be controlled with the entire set of functions from pyPulsedThread.h. Setting timing and requesting tasks functions as before.</p>p>
+<p>As described before, both init functions return a PyCapsule object wrapping the C++ pulsedThread object, allowing it to be controlled with the entire set of functions from pyPulsedThread.h. Setting timing and requesting tasks functions as before.</p>
 
 <p>You can change the Python object whose functions the pulsedThread C++ object calls with:<br>
 ptPyFuncs.setTaskObject(PyCapsule, Python Object)<br>
@@ -1042,7 +1042,110 @@ sudo python3 setup_pyPTpyFuncs.py install</p>
 <p>The main function makes a PT_Py_Greeter and sets it going, then does some calculations in a loop, printing results as it goes, to show the independence of the threaded PT_Py_Greeter from the main code. The class field PSEUDO_MUTEX is used for preventing print statements from different places in the code from executing at the same time, which would lead to garbled output. Unlike a real mutex, execution is not halted while waiting on the PSEUDO_MUTEX, hence the loops with calls to sleep to allow the other threads of execution to continue while waitng for the PSEUDO_MUTEX to be free. Also, read/write to the PSEUDO_MUTEX is not atomic; one thread may read PSEUDO_MUTEX as 0, and set it to 1, but in the very brief interval between reading and writing to PSEUDO_MUTEX, another thread may have read PSEUDO_MUTEX as 0 and so both threads would think they have the mutex.</p>
 
 <a name="ptPyFuncs_GPIO"><h3>ptPyFuncs with Raspberry Pi GPIO</h3></a>
-<p>One final example is presented using ptPyFuncs. PTpyGPIOTrain provides a simple example using ptPyFuncs with RPi.GPIO to time trains of pulses output on Raspberry Pi GPIO pins. The GPIO_Thread project does GPIO pulse control without need of Python call backs or RPi.GPIO</p>
+<p>One final example is presented using ptPyFuncs. PTpyGPIOTrain provides a simple example using ptPyFuncs with RPi.GPIO to time trains of pulses output on Raspberry Pi GPIO pins. The GPIO_Thread project does GPIO pulse control without need of Python call backs or RPi.GPIO, but GPIO is a good tangible example of timing, if you have a raspberry pi.</p>
+
+<p>There are two constructors for the PT_Py_GPIO_train class, one calls ptPyFuncs.initByFreq and the other calls ptPyFuncs.initByPulse. Both of these ptPyFunc module functions make a pulsedThread C++ object whose hiFunc and loFunc will call back to a Python object, then return a pyCapsule containing the address of that pulsedThread object. The pyCapsule is saved as self.task_ptr. </p>
+
+<p>The PT_Py_GPIO_train object will use itself as the Python object providing HiFunc and LoFunc. They are very simple, using GPIO.output to set a GPIO pin high or low. PT_Py_GPIO_train can do software pulse width modulation with an end Function that cycles through an array of duty cycles. TurnOnEndFunc creates an array of floating point data, and uses ptPyFuncs.cosDutyCycleArray to fill the array with a cosine wave. This demonstrates accessing the same floating point array in C++ as in Python, plus calculating and filling a big array runs faster in C++ than in Python. TurnOnEndFunc also creates variables to iterate reoeatedly through the array. TurnOnEndFunc then calls ptPyFuncs.setEndFuncObj with itself as the object to provide endFunc.</p>
+
+<p>You may recall that pulsedThread provides a method to use an endFunction that cycles through an array of duty cycles. You can share an array between Python and C++, and TurnOnEndFunc_CPP calls ptPyFuncs.setArrayEndFunc with the Python array. Performance should be better with the endFunc in C++ versus doing the same endFunc as a Python call back.</p>
+
+<pre>
+import ptPyFuncs
+from time import time, sleep
+import RPi.GPIO as GPIO
+from array import array as array
+
+class PT_Py_GPIO_train (object):
+    INIT_PULSES =1
+    INIT_FREQ=2
+    ACC_MODE_SLEEPS = 0
+    ACC_MODE_SLEEPS_AND_SPINS =1
+    ACC_MODE_SLEEPS_AND_OR_SPINS =2
+    END_FUNC_FREQ_MODE =0
+    END_FUNC_PULSE_MODE =1
+
+    def __init__ (self, initMode, pulseDelayOrTrainFreq, pulseDurationOrTrainDutyCycle, nPulsesOrTrainDuration, accuracy_level, p_pin):
+        self.pin = p_pin
+        GPIO.setup(self.pin, GPIO.OUT)
+        if initMode == PT_Py_GPIO_train.INIT_FREQ:
+            self.task_ptr = ptPyFuncs.initByFreq (self, float(pulseDelayOrTrainFreq), float (pulseDurationOrTrainDutyCycle), float (nPulsesOrTrainDuration), accuracy_level)
+        else:
+            self.task_ptr = ptPyFuncs.initByPulse (self, int (pulseDelayOrTrainFreq*1E6), int (pulseDurationOrTrainDutyCycle * 1E6), int(nPulsesOrTrainDuration), accuracy_level)
+        self.period =0
+        
+    def HiFunc(self):
+        GPIO.output (self.pin, GPIO.HIGH)
+        #print ('LO')
+
+    def LoFunc(self):
+        GPIO.output (self.pin, GPIO.LOW)
+        #print ('HI')
+        
+    def EndFunc (self, trainFreq, trainDutyCycle, trainLength, doTask):
+        ptPyFuncs.modTrainDuty (self.task_ptr, self.periodArray[self.iArray])
+        self.iArray +=1
+        if self.iArray == self.period:
+            self.iArray =0
+        
+    def TurnOnEndFunc (self, p_period):
+        self.periodArray = array ('f', [0] * 1000)
+        ptPyFuncs.cosDutyCycleArray(self.periodArray, 100, 0.6, 0.4)
+        self.period = p_period
+        self.iArray = 0
+        ptPyFuncs.setEndFuncObj(self.task_ptr, self, PT_Py_GPIO_train.END_FUNC_FREQ_MODE, 1)
+
+    def TurnOnEndFunc_CPP (self, p_period):
+        self.periodArray = array ('f', [0] * 1000)
+        ptPyFuncs.cosDutyCycleArray(self.periodArray, 100, 0.6, 0.4)
+        self.period = p_period
+        self.iArray = 0
+        ptPyFuncs.setArrayEndFunc(self.task_ptr, self.periodArray, 0, 0)
+
+    def TurnOffEndFunc (self, mode):
+        ptPyFuncs.unsetEndFunc (self.task_ptr)
+</pre></p>
+
+<p>A separate Python object can provide the endFunc. The class PT_Py_ObjForEndFunc serves this purpose, containing an endFunc that changes train frequency to play a major scale. Plug the output of the GPIO pin into a piezo buzzer for best effect.
+<pre>
+class PT_Py_ObjForEndFunc (object):
+    
+    def __init__(self, taskPtr):
+        self.task_ptr = taskPtr
+        self.iTone =0
+
+    def EndFunc (self, trainFreq, trainDutyCycle, trainLength, doTask):
+		# major scale:
+		#       do          re          me          fa          so          la          ti          do
+		#  	    tone        tone        semitone    tone        tone        tone        semitone
+		#	    0           1           2           3	    4	        5	    6
+		#	    7           8	    9	        10	    11	        12          13
+		#	    14          15	    16          17	    18          19          20
+        
+        print (trainFreq)
+        if self.iTone % 7 == 2 or self.iTone % 7 == 6:
+            newFrequency = trainFreq * 1.05946  # semitone
+            if self.iTone % 7 == 6:
+                newFrequency= round (newFrequency) # so floating point roundoff does not accumulate
+                #print ('octave', ((self.iTone + 1)/7), newFrequency)
+        else:
+            newFrequency = trainFreq * 1.12246  # tone
+ 
+        self.iTone +=1
+        #print (newFrequency)
+        ptPyFuncs.modTrainFreq (self.task_ptr, newFrequency)</p>
+</pre>
+The main function for PTpyGIOTrain.py presents a text-based menu allowing you to try out some of the options described above.
+<pre>
+-----------------------PTpyGPIO Tester--------------------------
+-1 to quit
+0 to set GPO pin
+1 for train with ACC_MODE_SLEEPS
+2 for train with ACC_MODE_SLEEPS_AND_SPINS
+3 for train with ACC_MODE_SLEEPS_AND_OR_SPINS
+4 for using an EndFunc from a separate object
+5 for using the C++ endFunc
+:</pre></p>
 
 </body>
 </html>

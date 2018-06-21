@@ -115,7 +115,7 @@ void pulsedThreadArrayStructCustomDel(void * taskData);
 /* **************** Non-Class Utility Functions Used by Thread that we want Inlined for speed yet available for subclasses ********************
 ******************************************************************************************************************************************
 
- ******************* Configure timespecs and timevals for thread timing and to do the waiting for acc levels 1 and 2 **************
+ ******************* Configure timespecs and timevals for thread timing and to do the waiting for acc level 0**************
 All we do is sleep for entire duration */
 inline void configureSleeper (unsigned int microSeconds, struct timespec *Sleeper){
 	Sleeper->tv_sec = microSeconds/1e06;

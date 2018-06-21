@@ -776,6 +776,34 @@ modCustomData is pointer to the data to be used by a modCustomFunc to modify the
 <h4>pthread_t taskThread, pthread_mutex_t taskMutex, and pthread_cond_t taskVar</h4>
 These are data structures provided by pthread.h. taskThread is a pthread structure, initialized when the pthread is created, and freed in the pulsedThread destructor. taskMutex is a mutex that is used in the lock and unlock operations to prevent simultaneous writing by the pthread and the pulsedThread object to doTask or perhaps taskData or endFuncData.  taskVar is a conditon variable used to signal from a pulsedThread object to the associate pthread that doTask has been modified and there is work to do.  The pthread uses the pthread_cond_wait function to sleep until a task has been called, then does the task(s)and sleeps again.
 
+<a name = "Timing_Utilities"><h2>Timing Utilities</h2></a>
+<p>Some non-class utility functions for timing the thread are contained in the file pulsedThread.h. These are marked as inline for added speed, as they may be called for every pulse. Unix timeval and timespec strucures from <a href ="http://pubs.opengroup.org/onlinepubs/7908799/xsh/systime.h.html">sys/time.h</a> are used heavily. It is neccessary to translate between timevals and timespecs because some Unix system functions for dealing with time require one of the two time formats, and some functions require the other. </p>
+<p>For accuracy level 0, the thread just sleeps for the entire pulse delay period and pulse duration, A timespec is made for both the pulse delay and the pulse duration in microseconds with ConfigureSleeper:<br>
+inline void configureSleeper (unsigned int microSeconds, struct timespec *Sleeper)<br>
+While generating pulses, the system nanosleep function is called with the timespec for either the delay or the duration, as appropriate, e.g., nanosleep (&amp;delaySleeper, NULL)</p>
+<p>For accuracy level 1, the thread sleeps for the delay/duration period - kSLEEPTURNAROUND, then wakes up and spins until the timed period ends. timespecs for pulse delay and duration are configured with:<br>inline bool configureTurnaroundSleeper (unsigned int microSeconds, struct timespec *Sleeper)<br>
+The function returns false if a requested period is shorter than kSLEEPTURNAROUND. While generating pulses, the sleeping and spinning is accomplished with the function:<br>
+inline void WAITINLINE1 (bool itSleeps, struct timespec *sleeper, struct timeval* spinEndTime)<br>
+The thread calculates the timeval for spinEndTime by adding the pulse delay or duration to the current time before calling WAITINLINE1. If itSleeps is true, WAITINLINE1 nanosleeps for the duration of the timespec, then spins in a loop comparing the current time to spinEndTime:<br>
+for (gettimeofday (&amp;currentTime, NULL);(timercmp (&amp;currentTime, spinEndTime, &lt;)); gettimeofday (&amp;currentTime, NULL));<br></p>
+<p>For accuracy level 2, sleep durations are not configured once, but are configured on the fly, individualy for each period. This is done to keep the pulsedThread on time as much as possible:<br>
+inline void WAITINLINE2 (bool itSleeps, struct timeval* turnaroundTime, struct timeval* spinEndTime)<br>
+<pre>
+if (timercmp (&amp;currentTime, &amp;sleepEndTime, &lt;)){  // if current time is less than sleep end time, calculate a sleep time
+	timersub (&amp;sleepEndTime, &amp;currentTime, &amp;sleepEndTime); //subtract current time from sleep end time , so sleep end time is a duration
+	TIMEVAL_TO_TIMESPEC(&amp;sleepEndTime, &amp;sleeper); 
+	nanosleep (&amp;sleeper, NULL);</pre></p>
+<p>Two utility functions are also provided to convert between task timing description as:
+<ol><li>microsecond pulse delay</li><li>microsecond pulse duration</li><li>number of pulses</li></ol> and task timing description as:<ol><li>train frequency in Hz</li><li>train duty cycle (0-1)</li><li>train duration (seconds)</li></ol>These functions change the values in the taskParams Structure, keeping the informaton in the two formats in synch.
+<dl>
+	<dt>inline int ticks2Times (unsigned int pulseDelay, unsigned int pulseDuration, unsigned int nPulses, taskParams &amp;theTask)</dt>
+	<dd>Converts from pulse-based info (pulseDelay, pulseDuation, number of pulses) to frequency-based info (trainDuration, frequency, dutyCycle) and updates taskParams Structure</dd>
+	<dt>inline int times2Ticks (float frequency, float dutyCycle, float trainDuration, taskParams &amp;theTask)</dt>
+	<dd>Converts from frequency-based info (trainDuration, frequency, dutyCycle) to pulse-based info (pulseDelay, pulseDuation, number of pulses) and updates taskParams Structure</dd>
+</dl>These functions are called from most of the pulsedThread class methods that change timing or number of pulses. 
+</p>
+
+
 <h2>Using pulsedThread in a Python/C Module</h2>
 <p>A Python/C module uses normal C or C++ code, such as that described in pulsedThread.h, plus the special C functions defined in Python.h that can interact with Python objects and provide the means for Python functions to call C and C++ code. For general information on writing Python/C modules, see the <a href="https://docs.python.org/3.4/c-api/index.html">Python/C API Reference Manual</a>.  A Python/C module provides Python functions that behave like normal Python functions but call directly into and receive results from custom C/C++ code.  The file pyPulsedThread.h. includes both pulsedThread.h and Python.h and provides functions for a Python interface to the pulsedThread C++ library. The steps to writing a Python/C module:
 <ol>

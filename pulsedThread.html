@@ -882,7 +882,7 @@ It sounds complicated, but some of the code is the same for all modules, and can
 #include "Greeter.h"
 /******************************C++ Code that is called from Python - forming the interface to the Python Module*****************
 This is where you put functions to create and interact with the C++ pulsedThread object, and also use function from Python.h to 
-create, return to Python, and interact with Python objects. All we need to do is create a pulsedThread and  we can
+create, return to Python, and interact with Python objects. All we need to do is create a pulsedThread and we can
 use the function in pyPulsedThread.h to run it */
 /* makes a pulsedThread object and returns to Python a pyCapsule containing a pointer to the pulsedThread*/
 static PyObject* pulsed_C_Greeter (PyObject *self, PyObject *args) {

@@ -155,10 +155,10 @@ static PyObject*  pulsedThread_modDutyCycle (PyObject *self, PyObject *args) {
 }
 
 
-/* ***** Checks whether a mod function has been called yet or not *****/
+/* Calls getModCustomStatus, returns 1 if a modData or ModCustom function is waiting to be run, else 0 */
 static PyObject* pulsedThread_modCustomStatus (PyObject *self, PyObject *PyPtr) {
 	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
-	return Py_BuildValue("i",  threadPtr -> getModCustomStatus());
+	return Py_BuildValue("i", threadPtr ->getModCustomStatus ());
 }
 
 /* ---------Getters for pulse timing based on individual pulses and numbers of pulses--------------*/
@@ -386,10 +386,5 @@ static PyObject* pulsedThread_cosineDutyCycleArray (PyObject *self, PyObject *ar
 	Py_RETURN_NONE;
 }
 
-/* Calls getModCustomStatus, returns 1 if a modData or ModCustom function is waiting to be run, else 0 */
-static PyObject* pulsedThread_modCustomStatus (PyObject *self, PyObject *PyPtr) {
-	pulsedThread * threadPtr = static_cast<pulsedThread * > (PyCapsule_GetPointer(PyPtr, "pulsedThread"));
-	return Py_BuildValue("i", threadPtr ->getModCustomStatus ());
-}
 
 #endif

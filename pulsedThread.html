@@ -62,6 +62,11 @@ Make sure to run make install before running make greeter or make minimalGreeter
 		</ol>
 	</li>
 	
+	<li>Just Programmer Things
+	<ol>
+		<li><a href = "#GDB_PYTHON_C">Using gdb with Python C Module</a></li>
+	</ol>
+</li>
 </ol>
 
 <a name="LIST_OF_FILES"><h2>List of Files</h2></a>
@@ -1174,6 +1179,18 @@ The main function for PTpyGIOTrain.py presents a text-based menu allowing you to
 4 for using an EndFunc from a separate object
 5 for using the C++ endFunc
 :</pre></p>
+
+<h2>Just Programmer Things</h2>
+<a name = "GDB_PYTHON_C"><h3>Using gdb with a Python C Module</h3></a>
+<p>If you are writing your own Python C Module by subclassing pulsedThread and using the code in pyPulsedThread.h, you may wish to use the <a href = "https://wiki.python.org/moin/DebuggingWithGdb">gdb debugger with Python</a>. Here are some tips for doing so.</p>
+First make sure you have gdb and python3-dbg packages installed.<br>Compile the extension module with -g option for including debugging information, and with optimizations off, -O0.  The setup.py file can include a line for extra compile options: <br>
+extra_compile_args=["-O0", "-g", "-std=gnu++11"],<br>
+After debugging you can remove the "-g" and change the the optimization back to O3<br>
+Launch python from gdb, perhaps with sudo, if your C module needs elevated priveleges, as for accessing GPIO:<br>sudo gdb python 3<br>
+Set a breakpoint on a particular line with b, e.g.: b PWM_Thread.cpp:924 <br>
+Run a python script that uses your C module: run PTPWM_tester.py<br>
+When a break point hits, Use s and c to step through the code, or continue to next breakpoint.<br>
+Read <a href="https://llllllllll.github.io/c-extension-tutorial/gdb.html"> this tutorial</a>for more details.
 
 </body>
 </html>

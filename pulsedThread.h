@@ -26,7 +26,7 @@ Last Modified:
 
 
  /* ***define beVerbose to non-zero to print out messages that may be useful for debugging or understanding how the code runs ****/
-#define beVerbose 1
+#define beVerbose 0
 #if beVerbose
 #include <stdio.h>
 #endif

@@ -837,6 +837,13 @@ int pulsedThread::getpulseDelayUsecs (void){
 	return theTask.pulseDelayUsecs;
 }
 
+
+// returns a pointer to the whole taskParams structure
+taskParams * pulsedThread::getTask (void){
+	return &theTask;
+}
+
+
 // returns pointer to task custom data
 void * pulsedThread::getTaskData (void){
 	return theTask.taskData;

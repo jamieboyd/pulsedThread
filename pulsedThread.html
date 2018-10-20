@@ -291,8 +291,10 @@ Note that unSetEndFunc loses the reference to endFunc; there is no corresponding
 	<dt>int isLocking</dt><dd> flag to indicate if you want to wait for pthread to finish a task. You can set this to 0 IF you are absolutely sure the pthread will not be accessing the custom data</dd></dl></dd>
 <dt>int getModCustomStatus (void)</dt>
 <dd>Returns 1 if the pulsedThread object is waiting for the pThread to run the modData function, else 0</dd>
+<dt>taskParams * getTask (void)</dt>
+<dd>returns a pointer to the whole taskParams structure taskParams structure. Can be used to access all parts of the task. Be careful</dd>
 <dt>void * getTaskData (void)</dt>
-<dd>Returns the pulsedThread's taskData pointer. Can be used to read or write the taskData directly. Be careful.</dd>
+<dd>Returns pointer to just the taskData of the pulsedThread's   Can be used to read or write the taskData directly. Be careful.</dd>
 <dt>void * getEndFuncData (void)</dt>
 <dd>returns a pointer to the endFunc data for the task</dd>
 <dt>void getTaskMutex (void)</dt>

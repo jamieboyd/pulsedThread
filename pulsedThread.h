@@ -26,7 +26,7 @@ Last Modified:
 
 
  /* ***define beVerbose to non-zero to print out messages that may be useful for debugging or understanding how the code runs ****/
-#define beVerbose 0
+#define beVerbose 1
 #if beVerbose
 #include <stdio.h>
 #endif
@@ -266,7 +266,8 @@ class pulsedThread{
 		int getModCustomStatus (void); // returns 1 if waiting for the pthread to do a requested modification for either taskData or endFunc data
 		void getTaskMutex (void);
 		void giveUpTaskMutex (void);
-		void * getTaskData (void); // returns a pointer to the custom data for the task
+		taskParams * getTask (void); // returns a pointer to the taskParams structure
+		void * getTaskData (void); // returns a pointer to just the custom data from the taskParams structure
 		void * getEndFuncData (void); // returns a pointer to the endFunc data for the task
 		/* ************* checking task data and Hi and Lo functions ******************************************************************/
 		void setLowFunc (void (*loFunc)(void *)); // sets the function that is called on low part of cycle

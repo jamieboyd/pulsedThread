@@ -242,6 +242,7 @@ class pulsedThread{
 		void DoTask (void); // requests that the thread perform its task once, as currently configured, if not an infinite train, or will start an infinite train
 		void DoTasks (unsigned int nTasks); // requests that the thread perform its task nTasks times, as currently configured, or
 		void UnDoTasks (void); // removes requested tasks in doTask, save 1. Thread stops after current task
+		void DoOrUndoTasks(int nTasks); // signed integer, to add OR ubtract from the number of tasks left to do
 		int isBusy(void); // checks if a task is busy, returns how many tasks are left to do
 		int waitOnBusy(float timeOut); // doesn't return until a thread is no longer busy
 		// for infinite trains

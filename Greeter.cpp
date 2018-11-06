@@ -97,7 +97,7 @@ int main(int argc, char **argv){
 		return 0;
 	}
 	train1->DoTask ();// a train of 10 times should be enough, so just do it once
-	train2->DoTask ();
+	train2->DoOrUndoTasks (1);
 	// show that the train is running on its own
 	printf ("Trains were started and should be printing in a second\n");
 	// a loop to show we can do real work in the main thread while the pulsedThreads do their own things.

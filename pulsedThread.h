@@ -26,7 +26,7 @@ Last Modified:
 
 
  /* ***define beVerbose to non-zero to print out messages that may be useful for debugging or understanding how the code runs ****/
-#define beVerbose 1
+#define beVerbose 0
 #if beVerbose
 #include <stdio.h>
 #endif
@@ -34,7 +34,7 @@ Last Modified:
 const int ACC_MODE_SLEEPS = 0;				// thread sleeps for duration of period
 const int ACC_MODE_SLEEPS_AND_SPINS =1;		//thread sleeps for period - kSLEEPTURNAROUND microseconds, then spins for remaining time
 const int ACC_MODE_SLEEPS_AND_OR_SPINS =2;	//sleep time is re-calculated for each duration, sleep is countermanded if thread is running late
-const int kSLEEPTURNAROUND= 100;			//how long, in microseconds, we aim to spin for the end of pulse timing in accuracy levels 1 and 2
+const int kSLEEPTURNAROUND= 200;			//how long, in microseconds, we aim to spin for the end of pulse timing in accuracy levels 1 and 2
 
 /* ***********************************constants for different task modes ************************************************************************/
 const int kPULSE= 1; // waits for delay, calls hiFunc, waits for duration, calls low func
